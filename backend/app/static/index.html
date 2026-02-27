@@ -292,7 +292,7 @@
             <!-- Tabs -->
             <div class="flex border-b border-gray-700 bg-gray-800" role="tablist" aria-label="Draft assistant panels">
                 <button onclick="showTab('recommendations')" class="tab-btn active px-4 py-3 text-sm font-medium" data-tab="recommendations" role="tab" aria-selected="true" aria-controls="tab-recommendations">
-                    Recommendations
+                    Picks
                 </button>
                 <button onclick="showTab('my-team')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="my-team" role="tab" aria-selected="false" aria-controls="tab-my-team">
                     My Team
@@ -310,111 +310,57 @@
 
             <!-- Tab Content -->
             <div class="flex-1 overflow-y-auto p-4">
-                <!-- Recommendations Tab -->
+                <!-- Recommendations Tab — Decision Funnel Layout -->
                 <div id="tab-recommendations" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-recommendations">
-                    <!-- Position Scarcity Dashboard -->
-                    <div class="mb-4 collapsible-section" data-section="scarcity">
-                        <button onclick="toggleSection('scarcity')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="scarcity-dashboard">
-                            <div>
-                                <h3 class="text-lg font-semibold text-red-400">Position Scarcity</h3>
-                                <p class="text-xs text-gray-500">Supply remaining at each position</p>
-                            </div>
-                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </button>
-                        <div id="scarcity-dashboard" class="section-content mt-3"></div>
+
+                    <!-- Pick Status Banner -->
+                    <div id="sidebar-pick-banner" class="pick-status-banner pick-waiting mb-3" aria-live="polite">
+                        <span id="sidebar-banner-text">—</span>
                     </div>
 
-                    <!-- Category Impact Planner -->
-                    <div class="mb-4 collapsible-section" data-section="planner">
-                        <button onclick="toggleSection('planner')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="planner-dashboard">
-                            <div>
-                                <h3 class="text-lg font-semibold text-indigo-400">Category Planner</h3>
-                                <p class="text-xs text-gray-500">Track pace vs targets and close category gaps</p>
-                            </div>
-                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </button>
-                        <div id="planner-dashboard" class="section-content mt-3"></div>
+                    <!-- Hero Pick: #1 Recommendation -->
+                    <div id="hero-pick" class="mb-4">
+                        <!-- Populated by renderRecommendations() -->
                     </div>
 
-                    <!-- Top Recommended Picks -->
-                    <div class="mb-4 collapsible-section" data-section="recommended">
-                        <button onclick="toggleSection('recommended')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="recommended-picks">
-                            <div>
-                                <h3 class="text-lg font-semibold text-yellow-400">Recommended Picks</h3>
-                                <p class="text-xs text-gray-500">Top 3 picks based on rankings, projections, and expert consensus</p>
-                            </div>
-                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </button>
-                        <div id="recommended-picks" class="section-content space-y-3 mt-3">
-                            <!-- Recommended picks loaded dynamically -->
+                    <!-- Also Consider: unified compact list (remaining recommended + safe + risky + needs) -->
+                    <div class="mb-4">
+                        <p class="funnel-section-label">ALSO CONSIDER</p>
+                        <div id="also-consider-picks" class="space-y-1.5">
+                            <!-- Populated by renderRecommendations() -->
                         </div>
                     </div>
 
-                    <div class="mb-4 collapsible-section" data-section="safe">
-                        <button onclick="toggleSection('safe')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="safe-picks">
-                            <div>
-                                <h3 class="text-lg font-semibold text-emerald-400">Safe Picks</h3>
-                                <p class="text-xs text-gray-500">High consensus, low injury risk, proven players</p>
-                            </div>
-                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </button>
-                        <div id="safe-picks" class="section-content space-y-2 mt-3">
-                            <!-- Safe picks loaded dynamically -->
-                        </div>
-                    </div>
-
-                    <div class="mb-4 collapsible-section" data-section="risky">
-                        <button onclick="toggleSection('risky')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="risky-picks">
-                            <div>
-                                <h3 class="text-lg font-semibold text-orange-400">Risky Picks (High Upside)</h3>
-                                <p class="text-xs text-gray-500">High variance, injury concerns, but elite ceiling</p>
-                            </div>
-                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </button>
-                        <div id="risky-picks" class="section-content space-y-2 mt-3">
-                            <!-- Risky picks loaded dynamically -->
-                        </div>
-                    </div>
-
-                    <div class="mb-4 collapsible-section" data-section="needs">
-                        <button onclick="toggleSection('needs')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="needs-picks">
-                            <div>
-                                <h3 class="text-lg font-semibold text-blue-400">Based on Your Needs</h3>
-                                <p class="text-xs text-gray-500">Players that address your category weaknesses</p>
-                            </div>
-                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </button>
-                        <div id="needs-picks" class="section-content space-y-2 mt-3">
-                            <!-- Needs-based picks loaded dynamically -->
-                        </div>
-                    </div>
-
-                    <div class="mb-4 collapsible-section" data-section="prospects">
+                    <!-- Prospects (collapsible, keeper-focused) -->
+                    <div class="mb-2 collapsible-section" data-section="prospects">
                         <button onclick="toggleSection('prospects')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="prospect-picks">
                             <div>
-                                <h3 class="text-lg font-semibold text-purple-400">2026 Prospects</h3>
-                                <p class="text-xs text-gray-500">Top prospects for keeper league value</p>
+                                <h3 class="text-sm font-semibold text-purple-400">Prospects</h3>
+                                <p class="text-xs text-gray-500">Keeper league value</p>
                             </div>
-                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="section-chevron w-4 h-4 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
                         </button>
-                        <div id="prospect-picks" class="section-content space-y-2 mt-3">
-                            <!-- Prospect picks loaded dynamically -->
+                        <div id="prospect-picks" class="section-content space-y-2 mt-2">
+                            <!-- Populated by renderRecommendations() -->
                         </div>
                     </div>
+
+                    <!-- Market Context: collapsible drawer for Scarcity + Planner -->
+                    <div class="market-context-section mt-3">
+                        <button onclick="toggleMarketContext()" id="market-context-btn" class="market-context-toggle" aria-expanded="false" aria-controls="market-context-body">
+                            <span class="text-xs font-semibold text-gray-400 tracking-wider uppercase">Market Context</span>
+                            <svg class="market-context-chevron w-4 h-4 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="market-context-body" class="market-context-body collapsed">
+                            <div id="scarcity-dashboard" class="mb-4 mt-3"></div>
+                            <div id="planner-dashboard" class="mt-2 pb-3"></div>
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- My Team Tab -->

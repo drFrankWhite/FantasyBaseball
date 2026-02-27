@@ -407,8 +407,8 @@ thead th {
 }
 
 .recommendation-card:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: var(--glow-cyan), 0 10px 40px rgba(0, 0, 0, 0.5);
+    transform: translateY(-2px);
+    box-shadow: var(--glow-cyan), 0 6px 20px rgba(0, 0, 0, 0.4);
     border-color: var(--neon-magenta);
 }
 
@@ -425,13 +425,17 @@ thead th {
 .recommendation-card.recommended::after {
     content: 'LEGENDARY';
     position: absolute;
-    bottom: 8px;
-    left: 8px;
+    top: 8px;
+    right: 8px;
     font-family: 'Orbitron', sans-serif;
-    font-size: 0.65rem;
+    font-size: 0.5rem;
     font-weight: 700;
+    letter-spacing: 0.5px;
     color: var(--rarity-legendary);
-    text-shadow: var(--glow-gold);
+    background: rgba(255, 214, 0, 0.1);
+    border: 1px solid rgba(255, 214, 0, 0.3);
+    border-radius: 2px;
+    padding: 2px 5px;
 }
 
 .recommendation-card.safe {
@@ -970,6 +974,237 @@ input[type="text"]::placeholder {
 
 .section-content.collapsed {
     display: none;
+}
+
+/* ========================================
+   Decision Funnel — Pick Status Banner
+   ======================================== */
+.pick-status-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 1rem;
+    border-radius: var(--radius-md);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-align: center;
+    transition: all var(--transition-slow);
+}
+
+.pick-status-banner.pick-your-turn {
+    background: rgba(255, 214, 0, 0.12);
+    border: 1px solid var(--neon-amber);
+    color: var(--neon-amber);
+    animation: banner-pulse 1.5s ease-in-out infinite;
+}
+
+.pick-status-banner.pick-waiting {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+}
+
+@keyframes banner-pulse {
+    0%, 100% { box-shadow: none; }
+    50%       { box-shadow: 0 0 14px rgba(255, 214, 0, 0.35); }
+}
+
+/* ========================================
+   Decision Funnel — Hero Pick Card
+   ======================================== */
+.hero-pick-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: rgba(255, 214, 0, 0.15);
+    color: var(--neon-amber);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    font-weight: 900;
+    flex-shrink: 0;
+}
+
+.hero-pick-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1.2;
+}
+
+/* ========================================
+   Decision Funnel — Section Label
+   ======================================== */
+.funnel-section-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid rgba(0, 230, 118, 0.15);
+    margin-bottom: 0.5rem;
+}
+
+/* ========================================
+   Decision Funnel — Compact Pick Row
+   ======================================== */
+.compact-pick-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.7rem;
+    background: var(--bg-card);
+    border: 1px solid rgba(0, 230, 118, 0.12);
+    border-radius: var(--radius-md);
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.compact-pick-row:hover {
+    background: var(--bg-hover);
+    border-color: rgba(0, 230, 118, 0.3);
+}
+
+.compact-pick-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    flex: 1;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.compact-pick-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.compact-pick-right {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* ========================================
+   Decision Funnel — Pick Type Badges
+   ======================================== */
+.pick-type-badge {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.48rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 0.15rem 0.4rem;
+    border-radius: 2px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.pick-type-badge.pick-type-recommended {
+    background: rgba(255, 214, 0, 0.12);
+    color: var(--neon-amber);
+    border: 1px solid rgba(255, 214, 0, 0.35);
+}
+
+.pick-type-badge.pick-type-safe {
+    background: rgba(105, 240, 174, 0.1);
+    color: var(--neon-green);
+    border: 1px solid rgba(105, 240, 174, 0.3);
+}
+
+.pick-type-badge.pick-type-risky {
+    background: rgba(255, 109, 0, 0.1);
+    color: var(--neon-orange);
+    border: 1px solid rgba(255, 109, 0, 0.3);
+}
+
+.pick-type-badge.pick-type-needs {
+    background: rgba(64, 196, 255, 0.1);
+    color: var(--neon-blue);
+    border: 1px solid rgba(64, 196, 255, 0.3);
+}
+
+/* ========================================
+   Decision Funnel — Market Context Drawer
+   ======================================== */
+.market-context-section {
+    border: 1px solid rgba(0, 230, 118, 0.12);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.market-context-toggle {
+    width: 100%;
+    background: rgba(0, 230, 118, 0.03);
+    border: none;
+    padding: 0.6rem 0.875rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background-color var(--transition-fast);
+}
+
+.market-context-toggle:hover {
+    background: rgba(0, 230, 118, 0.07);
+}
+
+.market-context-body {
+    padding: 0 0.875rem;
+    border-top: 1px solid rgba(0, 230, 118, 0.1);
+}
+
+.market-context-body.collapsed {
+    display: none;
+}
+
+/* ========================================
+   Recommendation Card — Bug Fixes
+   ======================================== */
+
+/* Fix: LEGENDARY watermark moved to top-right, styled as a proper badge */
+.recommendation-card.recommended::after {
+    content: 'LEGENDARY';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    bottom: auto;
+    left: auto;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--rarity-legendary);
+    background: rgba(255, 214, 0, 0.1);
+    border: 1px solid rgba(255, 214, 0, 0.3);
+    border-radius: 2px;
+    padding: 2px 5px;
+}
+
+/* Fix: Reduce hover animation — no scale, gentler lift */
+.recommendation-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--glow-cyan), 0 6px 20px rgba(0, 0, 0, 0.4);
+    border-color: var(--neon-magenta);
 }
 
 /* ========================================

@@ -824,10 +824,8 @@ async function loadRecommendations() {
     if (!currentLeagueId) return;
 
     // Show loading states
-    showSectionLoading('recommended-picks', 'Analyzing top picks...');
-    showSectionLoading('safe-picks', 'Finding safe bets...');
-    showSectionLoading('risky-picks', 'Identifying high upside players...');
-    showSectionLoading('needs-picks', 'Calculating needs-based picks...');
+    showSectionLoading('hero-pick', 'Analyzing top picks...');
+    showSectionLoading('also-consider-picks', 'Loading additional picks...');
     showSectionLoading('prospect-picks', 'Evaluating prospects...');
     showSectionLoading('planner-dashboard', 'Building category plan...');
 
@@ -845,10 +843,8 @@ async function loadRecommendations() {
     } catch (error) {
         console.error('Failed to load recommendations:', error);
         showError(`Failed to load recommendations: ${error.message}`, 'error');
-        showSectionError('recommended-picks', error.message);
-        showSectionError('safe-picks', error.message);
-        showSectionError('risky-picks', error.message);
-        showSectionError('needs-picks', error.message);
+        showSectionError('hero-pick', error.message);
+        showSectionError('also-consider-picks', error.message);
         showSectionError('prospect-picks', error.message);
         showSectionError('planner-dashboard', error.message);
     }
@@ -1135,175 +1131,123 @@ function renderRecommendations() {
     // Re-render player list with highlights
     renderPlayerList();
 
-    // Recommended picks (top 3 synthesized recommendations)
-    const recommendedContainer = document.getElementById('recommended-picks');
-    recommendedContainer.innerHTML = (recommendations.recommended || []).map((pick, index) => `
-        <div class="recommendation-card recommended animate-slide-up" style="animation-delay: ${index * 100}ms">
-            <div class="flex justify-between items-start mb-3">
-                <div class="flex items-center gap-3">
-                    <span class="flex items-center justify-center w-8 h-8 rounded-full bg-yellow-500/20 text-yellow-400 font-bold text-lg">${index + 1}</span>
-                    <div>
-                        <button onclick="showPlayerDetail(${pick.player.id})" class="font-semibold text-lg hover:text-yellow-400 transition-colors">
-                            ${pick.player.name}
-                        </button>
-                        <div class="flex items-center gap-2 mt-1">
-                            <span class="text-sm text-gray-400">${pick.player.team || 'FA'}</span>
-                            ${renderPositionBadge(pick.player.positions)}
+    // ── DECISION FUNNEL RENDERING ────────────────────────────────────────
+
+    // 1. Hero Pick — the single top recommendation
+    const heroPick = (recommendations.recommended || [])[0];
+    const heroContainer = document.getElementById('hero-pick');
+    if (heroPick) {
+        heroContainer.innerHTML = `
+            <div class="recommendation-card recommended hero-pick-card animate-slide-up">
+                <div class="flex justify-between items-start mb-3">
+                    <div class="flex items-center gap-3">
+                        <span class="hero-pick-number">1</span>
+                        <div>
+                            <button onclick="showPlayerDetail(${heroPick.player.id})" class="hero-pick-name hover:text-yellow-400 transition-colors">
+                                ${heroPick.player.name}
+                            </button>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-sm text-gray-400">${heroPick.player.team || 'FA'}</span>
+                                ${renderPositionBadge(heroPick.player.positions)}
+                            </div>
                         </div>
                     </div>
+                    <div class="flex flex-col items-end gap-1.5">
+                        <span class="risk-badge ${
+                            heroPick.risk_level === 'low' ? 'safe' :
+                            heroPick.risk_level === 'medium' ? 'moderate' : 'risky'
+                        }">${heroPick.risk_level}</span>
+                        <span class="text-sm font-mono text-gray-400">#${heroPick.player.consensus_rank || '--'}</span>
+                    </div>
                 </div>
-                <div class="flex flex-col items-end gap-1">
-                    <span class="risk-badge ${
-                        pick.risk_level === 'low' ? 'safe' :
-                        pick.risk_level === 'medium' ? 'moderate' : 'risky'
-                    }">${pick.risk_level}</span>
-                    <span class="text-sm font-mono text-gray-400">#${pick.player.consensus_rank || '--'}</span>
-                </div>
-            </div>
-            <p class="text-sm text-white font-medium mb-3 leading-relaxed">${pick.summary}</p>
-            <ul class="text-sm text-gray-300 mb-3 space-y-2">
-                ${(pick.reasoning || []).map(r => `
-                    <li class="flex items-start gap-2">
-                        <span class="text-yellow-400 mt-0.5">→</span>
-                        <span>${r}</span>
-                    </li>
-                `).join('')}
-            </ul>
-            <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-700/50">
-                ${(pick.sources || []).slice(0, 4).map(s => `
-                    <a href="${s.url || '#'}" target="_blank" class="source-chip">
-                        ${s.name} <span class="font-mono">#${s.rank || '--'}</span>
-                    </a>
-                `).join('')}
-            </div>
-        </div>
-    `).join('') || '<p class="text-gray-500 text-sm">Loading recommendations...</p>';
+                <p class="text-sm text-white font-medium mb-3 leading-relaxed">${heroPick.summary}</p>
+                <ul class="text-sm text-gray-300 mb-3 space-y-1.5">
+                    ${(heroPick.reasoning || []).map(r => `
+                        <li class="flex items-start gap-2">
+                            <span class="text-yellow-400 mt-0.5 flex-shrink-0">→</span>
+                            <span>${r}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+                ${(heroPick.sources || []).length > 0 ? `
+                    <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-700/50">
+                        ${(heroPick.sources || []).slice(0, 4).map(s => `
+                            <a href="${s.url || '#'}" target="_blank" class="source-chip">
+                                ${s.name} <span class="font-mono">#${s.rank || '--'}</span>
+                            </a>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>`;
+    } else {
+        heroContainer.innerHTML = '<p class="text-gray-500 text-sm py-2">Loading recommendations...</p>';
+    }
+
+    // 2. Also Consider — unified compact list merging all remaining picks
+    const alsoConsiderItems = [];
+
+    // Remaining recommended picks (index 1+)
+    (recommendations.recommended || []).slice(1).forEach(p =>
+        alsoConsiderItems.push({ pick: p, pickType: 'recommended', typeLabel: 'TOP PICK',
+            hoverColor: 'hover:text-yellow-400', detail: p.summary }));
 
     // Safe picks
-    const safeContainer = document.getElementById('safe-picks');
-    safeContainer.innerHTML = (recommendations.safe || []).map((pick, index) => `
-        <div class="recommendation-card safe animate-slide-up" style="animation-delay: ${index * 75}ms">
-            <div class="flex justify-between items-start mb-2">
-                <div>
-                    <button onclick="showPlayerDetail(${pick.player.id})" class="font-semibold hover:text-emerald-400 transition-colors">
-                        ${pick.player.name}
-                    </button>
-                    <div class="flex items-center gap-2 mt-1">
-                        <span class="text-xs text-gray-400">${pick.player.team || 'FA'}</span>
-                        ${renderPositionBadge(pick.player.positions)}
-                    </div>
-                </div>
-                <span class="text-sm font-mono text-gray-400">#${pick.player.consensus_rank || '--'}</span>
-            </div>
-            <p class="text-sm text-gray-300 mb-3">${pick.rationale}</p>
-            <div class="flex flex-wrap gap-2">
-                ${(pick.sources || []).slice(0, 3).map(s => `
-                    <a href="${s.url || '#'}" target="_blank" class="source-chip small">
-                        ${s.name} #${s.rank || '--'}
-                    </a>
-                `).join('')}
-            </div>
-        </div>
-    `).join('') || '<p class="text-gray-500 text-sm">No safe picks available</p>';
+    (recommendations.safe || []).forEach(p =>
+        alsoConsiderItems.push({ pick: p, pickType: 'safe', typeLabel: 'SAFE',
+            hoverColor: 'hover:text-emerald-400', detail: p.rationale }));
 
     // Risky picks
-    const riskyContainer = document.getElementById('risky-picks');
-    riskyContainer.innerHTML = (recommendations.risky || []).map((pick, index) => `
-        <div class="recommendation-card risky animate-slide-up" style="animation-delay: ${index * 75}ms">
-            <div class="flex justify-between items-start mb-2">
-                <div>
-                    <button onclick="showPlayerDetail(${pick.player.id})" class="font-semibold hover:text-orange-400 transition-colors">
-                        ${pick.player.name}
-                    </button>
-                    <div class="flex items-center gap-2 mt-1">
-                        <span class="text-xs text-gray-400">${pick.player.team || 'FA'}</span>
-                        ${renderPositionBadge(pick.player.positions)}
-                    </div>
-                </div>
-                <span class="text-sm font-mono text-gray-400">#${pick.player.consensus_rank || '--'}</span>
-            </div>
-            <p class="text-sm text-gray-300 mb-2">${pick.rationale}</p>
-            <div class="flex flex-wrap gap-1 mb-2">
-                ${(pick.risk_factors || []).map(f => `
-                    <span class="risk-factor-tag">${f}</span>
-                `).join('')}
-            </div>
-            <div class="upside-highlight mb-3">
-                <span class="text-xs text-gray-400">Upside:</span>
-                <span class="text-sm text-emerald-400 ml-1">${pick.upside}</span>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                ${(pick.sources || []).slice(0, 3).map(s => `
-                    <a href="${s.url || '#'}" target="_blank" class="source-chip small">
-                        ${s.name} #${s.rank || '--'}
-                    </a>
-                `).join('')}
-            </div>
-        </div>
-    `).join('') || '<p class="text-gray-500 text-sm">No risky picks available</p>';
+    (recommendations.risky || []).forEach(p =>
+        alsoConsiderItems.push({ pick: p, pickType: 'risky', typeLabel: 'RISKY',
+            hoverColor: 'hover:text-orange-400', detail: p.upside ? `Upside: ${p.upside}` : p.rationale }));
 
     // Needs-based picks
-    const needsContainer = document.getElementById('needs-picks');
-    needsContainer.innerHTML = (recommendations.category_needs || []).map((pick, index) => `
-        <div class="recommendation-card needs animate-slide-up" style="animation-delay: ${index * 75}ms">
-            <div class="flex justify-between items-start mb-2">
-                <div>
-                    <button onclick="showPlayerDetail(${pick.player.id})" class="font-semibold hover:text-blue-400 transition-colors">
-                        ${pick.player.name}
-                    </button>
-                    <div class="flex items-center gap-2 mt-1">
-                        <span class="text-xs text-gray-400">${pick.player.team || 'FA'}</span>
-                        ${renderPositionBadge(pick.player.positions)}
-                    </div>
-                </div>
-                <div class="flex flex-col items-end gap-1">
-                    <span class="category-need-badge">${pick.need_addressed.toUpperCase()}</span>
-                    <span class="text-sm font-mono text-gray-400">#${pick.player.consensus_rank || '--'}</span>
-                </div>
-            </div>
-            <p class="text-sm text-gray-300 mb-3">${pick.rationale}</p>
-            <div class="strength-improvement">
-                <span class="text-xs text-gray-400 mr-2">Category Boost:</span>
-                <div class="flex items-center gap-2">
-                    <span class="strength-value from">${Math.round(pick.current_strength)}%</span>
-                    <span class="strength-arrow">→</span>
-                    <span class="strength-value to">${Math.round(pick.projected_strength)}%</span>
-                    <span class="strength-gain">+${Math.round(pick.projected_strength - pick.current_strength)}%</span>
-                </div>
-            </div>
-        </div>
-    `).join('') || '<p class="text-gray-500 text-sm">Set your team first to see needs-based picks</p>';
+    (recommendations.category_needs || []).forEach(p =>
+        alsoConsiderItems.push({ pick: p, pickType: 'needs', typeLabel: `FILLS ${(p.need_addressed || 'GAP').toUpperCase()}`,
+            hoverColor: 'hover:text-blue-400',
+            detail: `+${Math.round((p.projected_strength || 0) - (p.current_strength || 0))}% ${p.need_addressed || ''}` }));
 
-    // 2026 Prospects
+    const alsoConsiderContainer = document.getElementById('also-consider-picks');
+    if (alsoConsiderItems.length > 0) {
+        alsoConsiderContainer.innerHTML = alsoConsiderItems.map((item, index) => `
+            <div class="compact-pick-row animate-slide-up" style="animation-delay: ${index * 40}ms" title="${item.detail}">
+                <button onclick="showPlayerDetail(${item.pick.player.id})" class="compact-pick-name ${item.hoverColor}">
+                    ${item.pick.player.name}
+                </button>
+                <div class="compact-pick-meta">
+                    <span class="text-xs text-gray-500">${item.pick.player.team || 'FA'}</span>
+                    ${renderPositionBadge(item.pick.player.positions)}
+                </div>
+                <div class="compact-pick-right">
+                    <span class="pick-type-badge pick-type-${item.pickType}">${item.typeLabel}</span>
+                    <span class="text-xs text-gray-500 font-mono">#${item.pick.player.consensus_rank || '--'}</span>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        alsoConsiderContainer.innerHTML = '<p class="text-gray-500 text-sm py-2">No additional picks available</p>';
+    }
+
+    // 3. Prospects (keeper-focused collapsible)
     const prospectsContainer = document.getElementById('prospect-picks');
     prospectsContainer.innerHTML = (recommendations.prospects || []).map((pick, index) => `
-        <div class="recommendation-card prospect animate-slide-up" style="animation-delay: ${index * 75}ms">
-            <div class="flex justify-between items-start mb-2">
-                <div>
-                    <button onclick="showPlayerDetail(${pick.player.id})" class="font-semibold hover:text-purple-400 transition-colors">
-                        ${pick.player.name}
-                    </button>
-                    <div class="flex items-center gap-2 mt-1">
-                        <span class="text-xs text-gray-400">${pick.player.team || 'MiLB'}</span>
-                        ${renderPositionBadge(pick.player.positions)}
-                        <span class="eta-badge">ETA ${pick.eta}</span>
-                    </div>
-                </div>
-                <div class="flex flex-col items-end gap-1">
-                    ${pick.prospect_rank ? `<span class="prospect-rank-badge">#${pick.prospect_rank}</span>` : ''}
-                    <span class="keeper-value-badge ${pick.keeper_value}">${pick.keeper_value}</span>
+        <div class="compact-pick-row animate-slide-up" style="animation-delay: ${index * 50}ms">
+            <div class="flex-1 min-w-0">
+                <button onclick="showPlayerDetail(${pick.player.id})" class="compact-pick-name hover:text-purple-400 block">
+                    ${pick.player.name}
+                </button>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="text-xs text-gray-500">${pick.player.team || 'MiLB'}</span>
+                    ${renderPositionBadge(pick.player.positions)}
+                    <span class="eta-badge">ETA ${pick.eta}</span>
                 </div>
             </div>
-            <p class="text-sm text-purple-300 mb-2 leading-relaxed">${pick.upside}</p>
-            ${pick.risk_factors && pick.risk_factors.length > 0 ? `
-                <div class="flex flex-wrap gap-1">
-                    ${pick.risk_factors.slice(0, 2).map(f => `
-                        <span class="prospect-risk-tag">${f}</span>
-                    `).join('')}
-                </div>
-            ` : ''}
+            <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                ${pick.prospect_rank ? `<span class="prospect-rank-badge">#${pick.prospect_rank}</span>` : ''}
+                <span class="keeper-value-badge ${pick.keeper_value}">${pick.keeper_value}</span>
+            </div>
         </div>
-    `).join('') || '<p class="text-gray-500 text-sm">No prospects available - add prospects to enable keeper league analysis</p>';
+    `).join('') || '<p class="text-gray-500 text-sm py-2">No prospects available</p>';
 }
 
 // Update draft info
@@ -1316,6 +1260,22 @@ function updateDraftInfo(rec) {
         clockDiv.classList.remove('hidden');
         document.getElementById('clock-team').textContent =
             rec.picks_until_your_turn === 0 ? "YOU'RE UP!" : `${rec.picks_until_your_turn} picks away`;
+    }
+
+    // Update the sidebar pick status banner
+    const banner = document.getElementById('sidebar-pick-banner');
+    const bannerText = document.getElementById('sidebar-banner-text');
+    if (banner && bannerText) {
+        if (rec.picks_until_your_turn === 0) {
+            banner.className = 'pick-status-banner pick-your-turn mb-3';
+            bannerText.textContent = `YOUR PICK — Round ${Math.ceil(rec.current_pick / 12)}, Pick ${rec.current_pick}`;
+        } else if (rec.picks_until_your_turn !== null) {
+            banner.className = 'pick-status-banner pick-waiting mb-3';
+            bannerText.textContent = `${rec.picks_until_your_turn} pick${rec.picks_until_your_turn === 1 ? '' : 's'} until your turn`;
+        } else {
+            banner.className = 'pick-status-banner pick-waiting mb-3';
+            bannerText.textContent = `Round ${Math.ceil(rec.current_pick / 12)} · Pick ${rec.current_pick}`;
+        }
     }
 }
 
@@ -3369,6 +3329,26 @@ async function toggleInjury(playerId, currentlyInjured) {
     } catch (error) {
         console.error('Failed to update injury status:', error);
         alert('Failed to update injury status');
+    }
+}
+
+// Toggle the Market Context drawer in the Decision Funnel sidebar
+function toggleMarketContext() {
+    const body = document.getElementById('market-context-body');
+    const btn = document.getElementById('market-context-btn');
+    const chevron = btn ? btn.querySelector('.market-context-chevron') : null;
+
+    if (!body) return;
+
+    const isCollapsed = body.classList.contains('collapsed');
+    if (isCollapsed) {
+        body.classList.remove('collapsed');
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+    } else {
+        body.classList.add('collapsed');
+        if (chevron) chevron.style.transform = 'rotate(0deg)';
+        if (btn) btn.setAttribute('aria-expanded', 'false');
     }
 }
 
