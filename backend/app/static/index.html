@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Baseball Draft Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css?v=32">
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen overflow-hidden flex flex-col">
+    <!-- Draft Session Bar (shown when session is active) -->
+    <div id="draft-session-bar" class="hidden px-6 py-3">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-amber-400 rounded-full animate-pulse flex-shrink-0"></span>
+                    <span id="session-name-display" class="text-white font-medium text-sm"></span>
+                </div>
+                <span class="text-gray-600">·</span>
+                <!-- On The Clock Indicator -->
+                <div id="on-the-clock-container" class="flex items-center gap-1.5 text-sm">
+                    <span class="text-gray-400">Round</span>
+                    <span id="current-round-display" class="font-bold text-white">1</span>
+                    <span class="text-gray-600">·</span>
+                    <span class="text-gray-400">Pick</span>
+                    <span id="current-pick-display" class="font-bold text-white">1</span>
+                    <span class="text-gray-500 mx-1">—</span>
+                    <span id="on-the-clock-team" class="font-bold text-amber-300 text-base"></span>
+                    <span id="user-pick-indicator" class="hidden px-2 py-0.5 bg-green-600 text-xs font-bold rounded">YOUR PICK</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="undo-btn" onclick="undoPick()" disabled class="draft-icon-btn" title="Undo last pick (Ctrl+Z)" aria-label="Undo last pick">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
+                    </svg>
+                </button>
+                <button id="redo-btn" onclick="redoPick()" disabled class="draft-icon-btn" title="Redo last undone pick (Ctrl+Y)" aria-label="Redo last undone pick">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"></path>
+                    </svg>
+                </button>
+                <!-- Overflow Menu -->
+                <div class="relative">
+                    <button id="draft-overflow-btn" onclick="toggleDraftOverflowMenu()" class="draft-icon-btn" title="More options" aria-label="More draft options" aria-haspopup="true" aria-expanded="false">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                        </svg>
+                    </button>
+                    <div id="draft-overflow-menu" class="draft-overflow-menu hidden">
+                        <button onclick="showDraftBoard(); toggleDraftOverflowMenu()" class="overflow-menu-item">Draft Board</button>
+                        <button onclick="showSessionHistory(); toggleDraftOverflowMenu()" class="overflow-menu-item">Pick History</button>
+                        <div class="overflow-menu-divider"></div>
+                        <button onclick="saveCurrentSession(); toggleDraftOverflowMenu()" class="overflow-menu-item">Save Session</button>
+                        <button onclick="showRestoreSessionDropdown()" class="overflow-menu-item">Restore Session</button>
+                        <!-- Restore session sub-panel (toggled by showRestoreSessionDropdown) -->
+                        <div id="restore-session-dropdown" class="hidden border-t border-gray-700 mt-1 pt-1">
+                            <div class="text-xs text-gray-500 px-3 py-1">Saved Sessions</div>
+                            <div id="saved-sessions-list" class="max-h-48 overflow-y-auto">
+                                <div class="text-sm text-gray-500 text-center py-4">No saved sessions</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="confirmEndSession()" class="draft-end-btn">End Draft</button>
+            </div>
+        </div>
+        <!-- XP Bar (slim progress indicator) -->
+        <div class="xp-bar-container mt-2">
+            <div id="xp-bar-fill" class="xp-bar-fill" style="width: 0%"></div>
+            <span id="xp-text" class="xp-text">PICK 1 OF 240</span>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 px-6 py-3">
+        <div class="flex items-center justify-between">
+            <!-- Zone 1: Identity -->
+            <div class="flex items-center gap-3">
+                <span class="text-2xl select-none" aria-hidden="true">⚾</span>
+                <h1 class="text-lg font-bold">Draft Assistant</h1>
+                <span class="league-badge-pill">
+                    <span id="league-name">--</span>
+                </span>
+                <span id="team-name-pill" class="league-badge-pill team-badge-pill hidden">
+                    <span id="team-name">--</span>
+                </span>
+            </div>
+
+            <!-- Zone 2: Status (center) -->
+            <div id="data-status" class="header-status">
+                <span id="status-dot" class="status-dot"></span>
+                <span id="status-text" class="text-gray-400 text-sm">Current</span>
+                <span class="text-gray-600 text-sm">·</span>
+                <span id="last-updated" class="text-gray-400 text-sm">--</span>
+            </div>
+
+            <!-- Zone 3: Actions -->
+            <div class="flex items-center gap-2">
+                <!-- Draft Live Pill (shown when draft mode is active) -->
+                <div id="draft-mode-indicator" class="hidden items-center gap-1.5 px-3 py-1.5 bg-amber-900/40 border border-amber-500/60 rounded-full">
+                    <span class="w-2 h-2 bg-amber-400 rounded-full animate-pulse flex-shrink-0"></span>
+                    <span class="text-amber-300 text-xs font-semibold tracking-wide">Live</span>
+                </div>
+                <!-- Draft Mode Button (hidden until practice/ESPN mock session started) -->
+                <button id="draft-mode-btn" onclick="toggleDraftMode()" class="header-ghost-btn hidden" title="Auto-sync with ESPN draft">
+                    Draft Mode
+                </button>
+                <!-- Mock Draft -->
+                <button id="mock-draft-btn" onclick="showMockDraftSetup()" title="Start a mock draft practice session">
+                    ✦ Mock Draft
+                </button>
+                <!-- Sync Dropdown -->
+                <div class="relative">
+                    <button id="sync-btn" onclick="toggleSyncDropdown()" class="header-outline-btn" title="Sync data options">
+                        ⟳ Sync
+                    </button>
+                    <div id="sync-dropdown" class="sync-dropdown hidden">
+                        <button onclick="refreshData(); toggleSyncDropdown()" class="sync-dropdown-item">Quick Refresh</button>
+                        <button onclick="syncADP(); toggleSyncDropdown()" class="sync-dropdown-item">Sync ADP</button>
+                        <button onclick="refreshAllData(); toggleSyncDropdown()" class="sync-dropdown-item">Full Refresh</button>
+                    </div>
+                </div>
+                <!-- Settings Gear -->
+                <button onclick="showSettingsModal()" class="header-icon-btn" title="ESPN Settings" aria-label="ESPN Settings">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <!-- Hidden compatibility stubs — JS references these IDs for session persistence -->
+        <div class="hidden" aria-hidden="true">
+            <button id="save-session-btn" onclick="saveCurrentSession()">Save Session</button>
+            <button id="restore-session-btn" onclick="showRestoreSessionDropdown()">Restore Session</button>
+            <div id="session-status">
+                <span>Last saved:</span>
+                <span id="last-saved-timestamp">--</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ESPN Credentials Warning Banner -->
+    <div id="creds-warning-banner" class="hidden bg-yellow-900/60 border-b border-yellow-600/50 px-6 py-2 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-yellow-300 text-sm">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <span>ESPN credentials not configured. Draft Mode and live sync require valid credentials.</span>
+            <button onclick="showSettingsModal()" class="underline hover:text-yellow-100 font-medium ml-1">Configure</button>
+        </div>
+        <button onclick="document.getElementById('creds-warning-banner').classList.add('hidden')" class="text-yellow-400 hover:text-yellow-200 ml-4" aria-label="Dismiss warning">&times;</button>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex flex-1 min-h-0">
+        <!-- Left Panel: Draft Board -->
+        <div class="w-3/5 border-r border-gray-700 overflow-hidden flex flex-col">
+            <div class="p-4 bg-gray-800 border-b border-gray-700">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-lg font-semibold">Draft Board</span>
+                        <span id="current-pick-info" class="ml-4 text-gray-400">Pick 1 - Round 1</span>
+                    </div>
+                    <div id="on-the-clock" class="px-3 py-1 bg-yellow-600 rounded text-sm font-medium hidden">
+                        On the Clock: <span id="clock-team">--</span>
+                    </div>
+                </div>
+                <div class="mt-2 flex flex-col gap-2">
+                    <!-- Row 1: Search -->
+                    <div class="relative">
+                        <input type="text" id="player-search" placeholder="Search players..."
+                            class="w-full px-3 py-1 pr-8 bg-gray-700 border border-gray-600 rounded text-sm"
+                            oninput="searchPlayers(this.value)">
+                        <button type="button" id="search-clear" onclick="clearSearch()"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white hidden"
+                            title="Clear search">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <!-- Position color legend -->
+                    <div class="position-legend">
+                        <span class="legend-item" style="color: #ff3366">&#9679; P</span>
+                        <span class="legend-item" style="color: #ffff00">&#9679; C</span>
+                        <span class="legend-item" style="color: #4488ff">&#9679; INF</span>
+                        <span class="legend-item" style="color: #00ff88">&#9679; OF</span>
+                        <span class="legend-label">Position colors</span>
+                    </div>
+                    <!-- Row 2: Position buttons + Team + Clear -->
+                    <div class="flex items-center gap-2">
+                        <div id="position-filter" class="flex flex-wrap gap-1">
+                            <button type="button" class="pos-btn active" data-pos="" onclick="togglePosition(this)">All</button>
+                            <button type="button" class="pos-btn" data-pos="MULTI" onclick="togglePosition(this)">Multi</button>
+                            <button type="button" class="pos-btn" data-pos="C" onclick="togglePosition(this)">C</button>
+                            <button type="button" class="pos-btn" data-pos="1B" onclick="togglePosition(this)">1B</button>
+                            <button type="button" class="pos-btn" data-pos="2B" onclick="togglePosition(this)">2B</button>
+                            <button type="button" class="pos-btn" data-pos="3B" onclick="togglePosition(this)">3B</button>
+                            <button type="button" class="pos-btn" data-pos="SS" onclick="togglePosition(this)">SS</button>
+                            <button type="button" class="pos-btn" data-pos="OF" onclick="togglePosition(this)">OF</button>
+                            <button type="button" class="pos-btn" data-pos="SP" onclick="togglePosition(this)">SP</button>
+                            <button type="button" class="pos-btn" data-pos="RP" onclick="togglePosition(this)">RP</button>
+                            <button type="button" class="pos-btn" data-pos="RP/SP" onclick="togglePosition(this)">RP/SP</button>
+                        </div>
+                        <select id="team-filter" class="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm" onchange="filterByTeam(this.value)">
+                            <option value="">All Teams</option>
+                            <option value="ARI">ARI</option>
+                            <option value="ATL">ATL</option>
+                            <option value="BAL">BAL</option>
+                            <option value="BOS">BOS</option>
+                            <option value="CHC">CHC</option>
+                            <option value="CHW">CHW</option>
+                            <option value="CIN">CIN</option>
+                            <option value="CLE">CLE</option>
+                            <option value="COL">COL</option>
+                            <option value="DET">DET</option>
+                            <option value="HOU">HOU</option>
+                            <option value="KC">KC</option>
+                            <option value="LAA">LAA</option>
+                            <option value="LAD">LAD</option>
+                            <option value="MIA">MIA</option>
+                            <option value="MIL">MIL</option>
+                            <option value="MIN">MIN</option>
+                            <option value="NYM">NYM</option>
+                            <option value="NYY">NYY</option>
+                            <option value="OAK">OAK</option>
+                            <option value="PHI">PHI</option>
+                            <option value="PIT">PIT</option>
+                            <option value="SD">SD</option>
+                            <option value="SEA">SEA</option>
+                            <option value="SF">SF</option>
+                            <option value="STL">STL</option>
+                            <option value="TB">TB</option>
+                            <option value="TEX">TEX</option>
+                            <option value="TOR">TOR</option>
+                            <option value="WSH">WSH</option>
+                        </select>
+                        <button type="button" class="pos-btn" onclick="clearAllFilters()" title="Clear all filters">Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player List -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <table class="w-full text-sm">
+                    <thead class="text-gray-400 text-left sticky top-0 bg-gray-900 z-10">
+                        <tr>
+                            <th class="py-2 px-2">Rank</th>
+                            <th class="py-2 px-2">Player</th>
+                            <th class="py-2 px-2">Team</th>
+                            <th class="py-2 px-2">Pos</th>
+                            <th class="py-2 px-2">Tier</th>
+                            <th class="py-2 px-2 cursor-pointer select-none" onclick="handleSort('overall')">'25 Overall<span id="sort-overall"></span></th>
+                            <th class="py-2 px-2 cursor-pointer select-none" onclick="handleSort('pos')">'25 Pos<span id="sort-pos"></span></th>
+                            <th class="py-2 px-2 cursor-pointer select-none" onclick="handleSort('risk')">Risk<span id="sort-risk"></span></th>
+                            <th class="py-2 px-2 cursor-pointer select-none" onclick="handleSort('value')">Value<span id="sort-value"></span></th>
+                            <th class="py-2 px-2">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="player-list">
+                        <!-- Players loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Player Comparison Tray -->
+            <div id="compare-tray" class="compare-tray hidden">
+                <div class="flex items-center justify-between px-4 py-2">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider">Compare</span>
+                        <div id="compare-slots" class="flex items-center gap-2">
+                            <span id="compare-slot-0" class="compare-slot-empty">Empty</span>
+                            <span class="text-gray-600">vs</span>
+                            <span id="compare-slot-1" class="compare-slot-empty">Empty</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="compare-btn" onclick="openComparison()" class="px-3 py-1 text-xs font-bold bg-gradient-to-r from-cyan-600 to-blue-600 rounded hidden hover:from-cyan-500 hover:to-blue-500 transition-all">
+                            Compare
+                        </button>
+                        <button onclick="clearCompare()" class="px-2 py-1 text-xs text-gray-500 hover:text-gray-300 transition-colors" aria-label="Clear comparison">&times;</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Recommendations -->
+        <div class="w-2/5 flex flex-col overflow-hidden">
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-700 bg-gray-800" role="tablist" aria-label="Draft assistant panels">
+                <button onclick="showTab('recommendations')" class="tab-btn active px-4 py-3 text-sm font-medium" data-tab="recommendations" role="tab" aria-selected="true" aria-controls="tab-recommendations">
+                    Recommendations
+                </button>
+                <button onclick="showTab('my-team')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="my-team" role="tab" aria-selected="false" aria-controls="tab-my-team">
+                    My Team
+                </button>
+                <button onclick="showTab('draft-history')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="draft-history" role="tab" aria-selected="false" aria-controls="tab-draft-history">
+                    History
+                </button>
+                <button onclick="showTab('teams')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="teams" role="tab" aria-selected="false" aria-controls="tab-teams">
+                    Teams
+                </button>
+                <button onclick="showTab('keepers')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="keepers" role="tab" aria-selected="false" aria-controls="tab-keepers">
+                    Keepers
+                </button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <!-- Recommendations Tab -->
+                <div id="tab-recommendations" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-recommendations">
+                    <!-- Position Scarcity Dashboard -->
+                    <div class="mb-4 collapsible-section" data-section="scarcity">
+                        <button onclick="toggleSection('scarcity')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="scarcity-dashboard">
+                            <div>
+                                <h3 class="text-lg font-semibold text-red-400">Position Scarcity</h3>
+                                <p class="text-xs text-gray-500">Supply remaining at each position</p>
+                            </div>
+                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="scarcity-dashboard" class="section-content mt-3"></div>
+                    </div>
+
+                    <!-- Category Impact Planner -->
+                    <div class="mb-4 collapsible-section" data-section="planner">
+                        <button onclick="toggleSection('planner')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="planner-dashboard">
+                            <div>
+                                <h3 class="text-lg font-semibold text-indigo-400">Category Planner</h3>
+                                <p class="text-xs text-gray-500">Track pace vs targets and close category gaps</p>
+                            </div>
+                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="planner-dashboard" class="section-content mt-3"></div>
+                    </div>
+
+                    <!-- Top Recommended Picks -->
+                    <div class="mb-4 collapsible-section" data-section="recommended">
+                        <button onclick="toggleSection('recommended')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="recommended-picks">
+                            <div>
+                                <h3 class="text-lg font-semibold text-yellow-400">Recommended Picks</h3>
+                                <p class="text-xs text-gray-500">Top 3 picks based on rankings, projections, and expert consensus</p>
+                            </div>
+                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="recommended-picks" class="section-content space-y-3 mt-3">
+                            <!-- Recommended picks loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="mb-4 collapsible-section" data-section="safe">
+                        <button onclick="toggleSection('safe')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="safe-picks">
+                            <div>
+                                <h3 class="text-lg font-semibold text-emerald-400">Safe Picks</h3>
+                                <p class="text-xs text-gray-500">High consensus, low injury risk, proven players</p>
+                            </div>
+                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="safe-picks" class="section-content space-y-2 mt-3">
+                            <!-- Safe picks loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="mb-4 collapsible-section" data-section="risky">
+                        <button onclick="toggleSection('risky')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="risky-picks">
+                            <div>
+                                <h3 class="text-lg font-semibold text-orange-400">Risky Picks (High Upside)</h3>
+                                <p class="text-xs text-gray-500">High variance, injury concerns, but elite ceiling</p>
+                            </div>
+                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="risky-picks" class="section-content space-y-2 mt-3">
+                            <!-- Risky picks loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="mb-4 collapsible-section" data-section="needs">
+                        <button onclick="toggleSection('needs')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="needs-picks">
+                            <div>
+                                <h3 class="text-lg font-semibold text-blue-400">Based on Your Needs</h3>
+                                <p class="text-xs text-gray-500">Players that address your category weaknesses</p>
+                            </div>
+                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="needs-picks" class="section-content space-y-2 mt-3">
+                            <!-- Needs-based picks loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="mb-4 collapsible-section" data-section="prospects">
+                        <button onclick="toggleSection('prospects')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="prospect-picks">
+                            <div>
+                                <h3 class="text-lg font-semibold text-purple-400">2026 Prospects</h3>
+                                <p class="text-xs text-gray-500">Top prospects for keeper league value</p>
+                            </div>
+                            <svg class="section-chevron w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="prospect-picks" class="section-content space-y-2 mt-3">
+                            <!-- Prospect picks loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Team Tab -->
+                <div id="tab-my-team" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-my-team">
+                    <h3 class="text-lg font-semibold mb-4">Your Roster</h3>
+                    <div id="my-roster" class="space-y-2">
+                        <!-- Roster loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Draft History Tab -->
+                <div id="tab-draft-history" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-draft-history">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">Draft History</h3>
+                        <span id="history-pick-count" class="text-sm text-gray-500">0 picks</span>
+                    </div>
+                    <div id="draft-history-list" class="space-y-2">
+                        <!-- Draft history loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Teams Tab -->
+                <div id="tab-teams" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-teams">
+                    <!-- Draft Order Setup Section -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-amber-400">Draft Order</h3>
+                        </div>
+                        <div class="mb-3">
+                            <label class="text-xs text-gray-500 block mb-1">Number of Teams</label>
+                            <select id="teams-num-teams" onchange="updateTeamsTabNameFields()"
+                                class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500 focus:outline-none">
+                                <option value="8">8 Teams</option>
+                                <option value="10">10 Teams</option>
+                                <option value="12" selected>12 Teams</option>
+                                <option value="14">14 Teams</option>
+                                <option value="16">16 Teams</option>
+                            </select>
+                        </div>
+                        <div id="teams-names-container" class="space-y-2 max-h-64 overflow-y-auto mb-3">
+                            <!-- Team name inputs injected by updateTeamsTabNameFields() -->
+                        </div>
+                        <button onclick="saveTeamsTabConfig()" class="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold text-sm border border-gray-600 transition-all">
+                            💾 Save Draft Order
+                        </button>
+                    </div>
+
+                    <!-- Team Rosters Section (during draft) -->
+                    <div class="border-t border-gray-700 pt-4">
+                        <h3 class="text-lg font-semibold text-cyan-300 mb-3">Team Claim</h3>
+                        <div class="bg-gray-900/60 border border-gray-700 rounded-lg p-3 mb-4">
+                            <p id="claim-status" class="text-xs text-gray-400 mb-2">No team claimed yet.</p>
+                            <div class="flex gap-2 mb-2">
+                                <select id="claim-team-select" class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm">
+                                    <option value="">-- Select a team to claim --</option>
+                                </select>
+                                <button onclick="claimSelectedTeam()" class="px-3 py-2 bg-cyan-700 hover:bg-cyan-600 rounded text-sm">Claim</button>
+                            </div>
+                            <button onclick="releaseMyTeamClaim()" class="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs">Release My Claim</button>
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-gray-300 mb-3">Team Rosters</h3>
+                        <div class="mb-4">
+                            <select id="team-selector" onchange="loadSelectedTeamRoster()" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm">
+                                <option value="">-- Select a team --</option>
+                            </select>
+                        </div>
+                        <div id="selected-team-roster" class="space-y-2"></div>
+                    </div>
+                </div>
+
+                <!-- Keepers Tab -->
+                <div id="tab-keepers" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-keepers">
+                    <div class="keeper-section">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-amber-400">Keepers</h3>
+                            <span id="keeper-count" class="text-xs text-gray-500">0 keepers</span>
+                        </div>
+                        <!-- Add Keeper Form -->
+                        <div class="keeper-add-form mb-4">
+                            <div class="grid grid-cols-1 gap-2">
+                                <div>
+                                    <label class="text-xs text-gray-500 block mb-1">Team Name</label>
+                                    <select id="keeper-team-select"
+                                        class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500 focus:outline-none">
+                                        <option value="">Select a team...</option>
+                                    </select>
+                                </div>
+                                <div class="relative">
+                                    <label class="text-xs text-gray-500 block mb-1">Player</label>
+                                    <input type="text" id="keeper-player-input"
+                                        placeholder="Search for player..."
+                                        oninput="searchKeeperPlayer(this.value)"
+                                        autocomplete="off"
+                                        class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500 focus:outline-none">
+                                    <div id="keeper-autocomplete" class="keeper-autocomplete hidden"></div>
+                                    <input type="hidden" id="keeper-player-id">
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="flex-1">
+                                        <label class="text-xs text-gray-500 block mb-1">Round</label>
+                                        <select id="keeper-round-select"
+                                            class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500 focus:outline-none">
+                                        </select>
+                                    </div>
+                                    <div class="flex items-end">
+                                        <button onclick="addKeeper()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded text-sm font-medium transition-colors">
+                                            Add Keeper
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Keepers Display -->
+                        <div id="keepers-display" class="space-y-3">
+                            <div class="text-center py-4">
+                                <p class="text-gray-500 text-sm">No keepers added yet</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Player Detail Modal -->
+    <div id="player-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="modal-player-name">
+        <div class="bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-hidden m-4 flex flex-col">
+            <!-- Loading State -->
+            <div id="modal-loading" class="hidden absolute inset-0 bg-gray-800 flex items-center justify-center z-10">
+                <div class="flex flex-col items-center gap-3">
+                    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-400"></div>
+                    <span class="text-gray-400 text-sm">Loading player data...</span>
+                </div>
+            </div>
+
+            <!-- Modal Header (sticky) -->
+            <div class="p-4 border-b border-gray-700 flex-shrink-0">
+                <div class="flex justify-between items-start">
+                    <div class="flex items-center gap-3">
+                        <div id="modal-position-badge" class="w-12 h-12 rounded-lg flex items-center justify-center text-lg font-bold bg-gray-700">
+                            <!-- Position badge -->
+                        </div>
+                        <div>
+                            <h2 id="modal-player-name" class="text-xl font-bold"></h2>
+                            <p id="modal-player-info" class="text-gray-400 text-sm"></p>
+                        </div>
+                    </div>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-white p-1" aria-label="Close player detail">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <!-- Injury Alert Banner -->
+                <div id="modal-injury-banner" class="hidden mt-3 p-2 bg-red-900/50 border border-red-700 rounded-lg flex items-center gap-2">
+                    <svg class="w-5 h-5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <span id="modal-injury-text" class="text-red-300 text-sm"></span>
+                </div>
+            </div>
+
+            <!-- Scrollable Content -->
+            <div class="p-4 overflow-y-auto flex-1 space-y-4">
+                <!-- Quick Stats Summary -->
+                <div id="modal-quick-stats" class="grid grid-cols-3 md:grid-cols-5 gap-3">
+                    <!-- Age -->
+                    <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">Age</div>
+                        <div id="modal-age" class="text-xl font-bold text-white">--</div>
+                    </div>
+                    <!-- ADP Gap (ESPN ADP vs Avg Rank) -->
+                    <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">ADP Gap</div>
+                        <div id="modal-adp-gap" class="text-xl font-bold">--</div>
+                    </div>
+                    <!-- Rank -->
+                    <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">ECR Rank</div>
+                        <div id="modal-rank" class="text-xl font-bold text-emerald-400">#--</div>
+                    </div>
+                    <!-- Avg ADP -->
+                    <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">Avg ADP</div>
+                        <div id="modal-avg-adp" class="text-xl font-bold text-amber-400">--</div>
+                    </div>
+                    <!-- Position Tier -->
+                    <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                        <div class="text-xs text-gray-400 uppercase tracking-wide">Position Tier</div>
+                        <div id="modal-position-tier" class="text-sm font-bold text-amber-400">--</div>
+                    </div>
+                </div>
+
+                <!-- Position Tiers -->
+                <div id="modal-tiers" class="hidden bg-gray-700/50 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                        </svg>
+                        <h4 class="font-semibold text-sm text-amber-400">Position Tiers</h4>
+                    </div>
+                    <div id="modal-tiers-content" class="space-y-1"></div>
+                </div>
+
+                <!-- Projections (Full Width) -->
+                <div class="bg-gray-700/50 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                        <h4 class="font-semibold text-sm text-emerald-400">Projections</h4>
+                    </div>
+                    <div id="modal-projections" class="text-sm">
+                        <!-- Projections loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- 2025 Stats (FanGraphs actuals / Statcast) -->
+                <div id="modal-stats-section" class="bg-gray-700/50 rounded-lg p-4 hidden">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <h4 class="font-semibold text-sm text-amber-400">2025 Stats</h4>
+                    </div>
+                    <div id="modal-stats-history" class="text-sm">
+                        <!-- Historical stats loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Two Column Layout for ADPs and Rankings -->
+                <div class="grid md:grid-cols-2 gap-4">
+                    <!-- ADPs by Source -->
+                    <div class="bg-gray-700/50 rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            <h4 class="font-semibold text-sm text-purple-400">ADP by Source</h4>
+                        </div>
+                        <div id="modal-adps" class="space-y-1 text-sm max-h-48 overflow-y-auto">
+                            <!-- ADPs loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Rankings by Source -->
+                    <div class="bg-gray-700/50 rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                            </svg>
+                            <h4 class="font-semibold text-sm text-cyan-400">Rankings by Source</h4>
+                        </div>
+                        <div id="modal-rankings" class="space-y-1 text-sm max-h-48 overflow-y-auto">
+                            <!-- Rankings loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Notes -->
+                <div id="modal-notes-section" class="hidden">
+                    <div class="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                                <h4 class="font-semibold text-sm text-blue-400">Notes</h4>
+                            </div>
+                            <button id="modal-notes-edit-btn" onclick="toggleNotesEdit()" class="text-xs text-gray-400 hover:text-blue-400 transition-colors">
+                                Edit
+                            </button>
+                        </div>
+                        <!-- Display mode -->
+                        <div id="modal-notes-display" class="text-sm text-gray-300 whitespace-pre-wrap"></div>
+                        <!-- Edit mode -->
+                        <div id="modal-notes-edit" class="hidden">
+                            <textarea id="modal-notes-textarea" class="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm text-gray-200 resize-y focus:border-blue-500 focus:outline-none" style="min-height: 80px" placeholder="Add scouting notes, analysis, or reminders..."></textarea>
+                            <div class="flex justify-end gap-2 mt-2">
+                                <button onclick="cancelNotesEdit()" class="px-3 py-1 text-xs rounded border border-gray-600 hover:bg-gray-700 transition-colors">Cancel</button>
+                                <button onclick="savePlayerNotes()" class="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 font-medium transition-colors">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Position Scarcity Context (shown for undrafted players) -->
+                <div id="modal-scarcity" class="hidden scarcity-context-section">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                        </svg>
+                        <h4 class="font-semibold text-sm text-red-400">Position Scarcity</h4>
+                    </div>
+                    <div id="modal-scarcity-content"></div>
+                </div>
+
+                <!-- Prospect Info (shown only for prospects) -->
+                <div id="modal-prospect-info" class="hidden bg-purple-900/30 border border-purple-700/50 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                        </svg>
+                        <span class="text-purple-300 font-medium text-sm">Prospect</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                            <div class="text-xs text-gray-400">FV Grade</div>
+                            <div id="modal-fv-grade" class="text-lg font-bold text-purple-300">--</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400">ETA</div>
+                            <div id="modal-eta" class="text-lg font-bold text-purple-300">--</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400">Level</div>
+                            <div id="modal-level" class="text-lg font-bold text-purple-300">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Risk Assessment -->
+                <div id="modal-risk" class="bg-gray-700/50 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <h4 class="font-semibold text-sm">Risk Assessment</h4>
+                    </div>
+                    <div id="modal-risk-content">
+                        <!-- Risk content loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Prospect Scouting Grades (shown only for prospects) -->
+                <div id="modal-scouting" class="hidden bg-gray-700/50 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                        <h4 class="font-semibold text-sm">Scouting Grades</h4>
+                    </div>
+                    <div class="flex gap-4">
+                        <div id="modal-radar-container" class="w-40 h-40 flex-shrink-0">
+                            <canvas id="modal-radar-chart"></canvas>
+                        </div>
+                        <div id="modal-grades-grid" class="flex-1 grid grid-cols-2 gap-2 text-sm">
+                            <!-- Grades loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prospect Consensus Rankings (shown only for prospects) -->
+                <div id="modal-consensus" class="hidden bg-gray-700/50 rounded-lg p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                        </svg>
+                        <h4 class="font-semibold text-sm">Prospect Consensus</h4>
+                    </div>
+                    <div id="modal-consensus-content" class="text-sm">
+                        <!-- Consensus data loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prediction Result Display -->
+            <div id="prediction-result" class="hidden p-4 border-t border-gray-700 flex-shrink-0 bg-gray-800/50">
+                <!-- Prediction results loaded dynamically -->
+            </div>
+
+            <!-- Action Bar (sticky footer) -->
+            <div id="modal-actions" class="p-4 border-t border-gray-700 flex-shrink-0 flex items-center justify-between gap-3 bg-gray-800">
+                <div class="flex items-center gap-2">
+                    <button id="modal-injury-toggle" onclick="toggleModalInjury()" class="px-3 py-2 text-sm rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors">
+                        Mark Injured
+                    </button>
+                    <button id="modal-predict-btn" onclick="predictPlayerAvailability()" class="px-3 py-2 text-sm rounded-lg border border-purple-600 text-purple-400 hover:bg-purple-900/30 transition-colors hidden">
+                        <span class="flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Predict
+                        </span>
+                    </button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors">
+                        Close
+                    </button>
+                    <button onclick="compareFromModal()" class="px-4 py-2 text-sm rounded-lg border border-cyan-600 text-cyan-400 hover:bg-cyan-900/30 font-medium transition-colors">
+                        Compare
+                    </button>
+                    <button id="modal-draft-btn" onclick="draftFromModal()" class="px-4 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium transition-colors">
+                        Draft Player
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mock Draft Setup Modal -->
+    <div id="mock-draft-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="mock-draft-modal-title">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg mx-4 border border-gray-700">
+            <div class="p-6 border-b border-gray-700">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 id="mock-draft-modal-title" class="text-2xl font-bold text-amber-400">Mock Draft Setup</h2>
+                        <p class="text-gray-400 mt-1">Practice before your real draft</p>
+                    </div>
+                    <button onclick="closeMockDraftModal()" class="text-gray-400 hover:text-white text-2xl" aria-label="Close mock draft setup">&times;</button>
+                </div>
+            </div>
+
+            <div class="p-6 space-y-6">
+                <!-- Option 1: Practice Mode -->
+                <div class="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <h3 class="font-bold text-lg text-emerald-400 mb-2">Quick Practice Mode</h3>
+                    <p class="text-sm text-gray-400 mb-4">
+                        Practice with manual pick tracking. Mark players as drafted with "Mine" or "Other" buttons.
+                        No ESPN connection needed.
+                    </p>
+                    <button onclick="startQuickPractice()" class="w-full py-2 px-4 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 rounded font-medium">
+                        Start Practice Session
+                    </button>
+                </div>
+
+                <!-- Option 2: ESPN Mock Draft -->
+                <div class="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <h3 class="font-bold text-lg text-blue-400 mb-2">ESPN Mock Draft (Auto-Sync)</h3>
+                    <p class="text-sm text-gray-400 mb-3">
+                        Connect to a real ESPN mock draft for automatic pick tracking.
+                    </p>
+
+                    <div class="space-y-3">
+                        <div class="text-sm">
+                            <span class="text-gray-300 font-medium">Step 1:</span>
+                            <a href="https://fantasy.espn.com/baseball/mockdraftlobby" target="_blank" class="text-blue-400 hover:text-blue-300 ml-2">
+                                Join an ESPN Mock Draft →
+                            </a>
+                        </div>
+                        <div class="text-sm">
+                            <span class="text-gray-300 font-medium">Step 2:</span>
+                            <span class="text-gray-400 ml-2">Once in the draft room, copy the League ID from the URL</span>
+                        </div>
+                        <div class="text-sm text-gray-500 bg-gray-800 p-2 rounded font-mono">
+                            fantasy.espn.com/baseball/draft?leagueId=<span class="text-amber-400">123456789</span>
+                        </div>
+                        <div>
+                            <label class="text-sm text-gray-300 block mb-1">Mock Draft League ID:</label>
+                            <input id="mock-league-id" type="text" placeholder="Enter ESPN League ID" class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded text-sm">
+                        </div>
+                        <button onclick="connectESPNMock()" class="w-full py-2 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 rounded font-medium">
+                            Connect to ESPN Draft
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Current Draft Status -->
+                <div id="draft-status-display" class="hidden p-3 bg-gray-900 rounded border border-gray-700">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">Current draft state:</span>
+                        <span id="drafted-count" class="text-amber-400 font-medium">0 players drafted</span>
+                    </div>
+                    <button onclick="resetDraft()" class="mt-2 w-full py-2 px-4 bg-red-900/50 hover:bg-red-800/50 border border-red-700 rounded text-sm text-red-300">
+                        Reset Draft (Start Fresh)
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-4 bg-gray-900/50 border-t border-gray-700 text-xs text-gray-500">
+                <strong>Tip:</strong> Open this app side-by-side with ESPN's draft window. Use "Mine" to track your picks and "Other" for opponent picks.
+            </div>
+        </div>
+    </div>
+
+    <!-- Draft Session Entry Modal -->
+    <div id="draft-session-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="draft-session-modal-title">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-md mx-4 border border-gray-700">
+            <div class="p-6 border-b border-gray-700">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 id="draft-session-modal-title" class="text-2xl font-bold text-amber-400">Start Draft Session</h2>
+                        <p class="text-gray-400 mt-1">Enter a name to track this draft</p>
+                    </div>
+                    <button onclick="closeDraftSessionModal()" class="text-gray-400 hover:text-white text-2xl" aria-label="Close draft session setup">&times;</button>
+                </div>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="text-sm text-gray-300 block mb-2">Session Name:</label>
+                    <input id="draft-session-name" type="text" placeholder="e.g., March 15 Draft, Mock Draft #3" class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-lg focus:border-amber-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm text-gray-300 block mb-2">Number of Teams:</label>
+                        <select id="draft-num-teams" class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:border-amber-500 focus:outline-none">
+                            <option value="8">8 Teams</option>
+                            <option value="10">10 Teams</option>
+                            <option value="12" selected>12 Teams</option>
+                            <option value="14">14 Teams</option>
+                            <option value="16">16 Teams</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-300 block mb-2">Your Draft Position:</label>
+                        <select id="draft-user-position" class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:border-amber-500 focus:outline-none">
+                            <!-- Options populated by JS based on num_teams -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Team Names Section -->
+                <div>
+                    <label class="text-sm text-gray-300 block mb-2">Team Names (optional):</label>
+                    <div id="team-names-container" class="space-y-2 max-h-40 overflow-y-auto bg-gray-900/50 rounded-lg p-3">
+                        <!-- Team name inputs populated by JS -->
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Leave blank to use "Team 1", "Team 2", etc.</p>
+                </div>
+
+                <div class="bg-amber-900/30 border border-amber-700/50 rounded-lg p-4">
+                    <h4 class="text-amber-300 font-medium mb-2">Draft Features:</h4>
+                    <ul class="text-sm text-amber-200/80 space-y-1">
+                        <li>• Snake draft order tracking</li>
+                        <li>• "On The Clock" indicator</li>
+                        <li>• Pick-by-pick team tracking</li>
+                        <li>• Full draft board view</li>
+                        <li>• Undo/Redo support</li>
+                    </ul>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="saveDraftConfig()" class="flex-1 py-3 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold text-sm border border-gray-600 transition-all">
+                        💾 Save Order
+                    </button>
+                    <button onclick="startDraftSession()" class="flex-2 py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-lg font-bold text-lg shadow-lg transition-all">
+                        Start Draft
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session History Modal -->
+    <div id="session-history-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="session-history-modal-title">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg mx-4 border border-gray-700 max-h-[80vh] flex flex-col">
+            <div class="p-4 border-b border-gray-700 flex-shrink-0">
+                <div class="flex justify-between items-center">
+                    <h2 id="session-history-modal-title" class="text-xl font-bold text-amber-400">Pick History</h2>
+                    <button onclick="closeSessionHistoryModal()" class="text-gray-400 hover:text-white text-2xl" aria-label="Close pick history">&times;</button>
+                </div>
+            </div>
+
+            <div id="session-history-content" class="p-4 overflow-y-auto flex-1">
+                <!-- History loaded dynamically -->
+            </div>
+
+            <div class="p-4 border-t border-gray-700 flex-shrink-0">
+                <button onclick="closeSessionHistoryModal()" class="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded font-medium">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Draft Board Modal -->
+    <div id="draft-board-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-6xl mx-4 border border-gray-700 max-h-[90vh] flex flex-col">
+            <div class="p-4 border-b border-gray-700 flex-shrink-0">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-bold text-purple-400">Draft Board</h2>
+                    <button onclick="closeDraftBoardModal()" class="text-gray-400 hover:text-white text-2xl" aria-label="Close draft board">&times;</button>
+                </div>
+            </div>
+
+            <div id="draft-board-content" class="p-4 overflow-auto flex-1">
+                <!-- Draft board loaded dynamically -->
+            </div>
+
+            <div class="p-4 border-t border-gray-700 flex-shrink-0">
+                <button onclick="closeDraftBoardModal()" class="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded font-medium">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Picker Modal (for selecting which team made a pick) -->
+    <div id="team-picker-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-sm mx-4 border border-gray-700">
+            <div class="p-4 border-b border-gray-700">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-cyan-400">Select Team</h2>
+                    <button onclick="closeTeamPickerModal()" class="text-gray-400 hover:text-white text-2xl" aria-label="Close team picker">&times;</button>
+                </div>
+                <p id="team-picker-player-name" class="text-sm text-gray-400 mt-1"></p>
+            </div>
+
+            <div id="team-picker-content" class="p-4 space-y-2 max-h-80 overflow-y-auto">
+                <!-- Team buttons loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Player Comparison Modal -->
+    <div id="compare-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50" onclick="if(event.target===this)closeComparison()">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl mx-4 border border-cyan-500/30 max-h-[90vh] overflow-y-auto">
+            <div id="compare-content">
+                <!-- Comparison content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ESPN Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" onclick="if(event.target===this)closeSettingsModal()">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-md mx-4 border border-gray-700">
+            <div class="p-6 border-b border-gray-700">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 id="settings-modal-title" class="text-2xl font-bold text-emerald-400">ESPN Settings</h2>
+                        <p class="text-gray-400 mt-1">Configure your ESPN credentials for draft sync</p>
+                    </div>
+                    <button onclick="closeSettingsModal()" class="text-gray-400 hover:text-white text-2xl" aria-label="Close ESPN settings">&times;</button>
+                </div>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <!-- Auto-detect button -->
+                <div>
+                    <button onclick="autoDetectESPNCredentials()"
+                        class="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-lg font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2"
+                        id="auto-detect-btn">
+                        <span>&#x1F50D;</span> Auto-Detect from Chrome
+                    </button>
+                    <p class="text-xs text-gray-500 mt-1 text-center">Reads ESPN cookies from your Chrome browser</p>
+                </div>
+
+                <div class="relative flex items-center my-3">
+                    <div class="flex-grow border-t border-gray-700"></div>
+                    <span class="mx-3 text-xs text-gray-500">or enter manually</span>
+                    <div class="flex-grow border-t border-gray-700"></div>
+                </div>
+
+                <div>
+                    <label class="text-sm text-gray-300 block mb-2">espn_s2 Cookie:</label>
+                    <textarea id="settings-espn-s2" rows="3" placeholder="Paste your espn_s2 cookie value here..."
+                        class="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm font-mono focus:border-emerald-500 focus:outline-none resize-none"></textarea>
+                </div>
+
+                <div>
+                    <label class="text-sm text-gray-300 block mb-2">SWID Cookie:</label>
+                    <input id="settings-swid" type="text" placeholder="Paste your SWID cookie value here (e.g. {GUID})"
+                        class="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm font-mono focus:border-emerald-500 focus:outline-none">
+                </div>
+
+                <div class="bg-gray-900/50 border border-gray-700 rounded-lg p-4">
+                    <h4 class="text-gray-300 font-medium mb-2 text-sm">How to find your ESPN cookies:</h4>
+                    <ol class="text-xs text-gray-400 space-y-1 list-decimal list-inside">
+                        <li>Log into ESPN Fantasy in your browser</li>
+                        <li>Open DevTools (F12) &rarr; Application tab</li>
+                        <li>In the sidebar: Cookies &rarr; espn.com</li>
+                        <li>Find and copy <code class="text-emerald-400">espn_s2</code> and <code class="text-emerald-400">SWID</code> values</li>
+                    </ol>
+                </div>
+
+                <div id="settings-test-result" class="hidden rounded-lg p-3 text-sm"></div>
+
+                <div class="flex gap-3">
+                    <button onclick="testESPNCredentials()" class="flex-1 py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium text-sm transition-colors">
+                        Test Connection
+                    </button>
+                    <button onclick="saveESPNCredentials()" class="flex-1 py-2 px-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-lg font-bold text-sm shadow-lg transition-all">
+                        Save Credentials
+                    </button>
+                </div>
+
+                <div class="relative flex items-center my-1">
+                    <div class="flex-grow border-t border-gray-700"></div>
+                    <span class="mx-3 text-xs text-gray-500">notes backup</span>
+                    <div class="flex-grow border-t border-gray-700"></div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="exportNotes()" class="flex-1 py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium text-sm transition-colors">
+                        &#x1F4BE; Export Notes
+                    </button>
+                    <label class="flex-1 py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium text-sm transition-colors text-center cursor-pointer">
+                        &#x1F4C2; Import Notes
+                        <input type="file" accept=".json" class="hidden" onchange="importNotes(this.files[0]); this.value=''">
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=70"></script>
+</body>
+</html>
