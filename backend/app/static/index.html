@@ -80,7 +80,7 @@
             <div class="flex items-center gap-3">
                 <span class="text-2xl select-none" aria-hidden="true">⚾</span>
                 <h1 class="text-lg font-bold">Draft Assistant</h1>
-                <span class="league-badge-pill">
+                <span id="league-name-badge" class="league-badge-pill hidden">
                     <span id="league-name">--</span>
                 </span>
                 <span id="team-name-pill" class="league-badge-pill team-badge-pill hidden">
@@ -1028,6 +1028,54 @@
         <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl mx-4 border border-cyan-500/30 max-h-[90vh] overflow-y-auto">
             <div id="compare-content">
                 <!-- Comparison content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- First-Run Setup Wizard Modal -->
+    <div id="setup-wizard-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="setup-wizard-title">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg mx-4 border border-blue-700">
+            <div class="p-6 border-b border-gray-700">
+                <h2 id="setup-wizard-title" class="text-xl font-bold text-white">Welcome to FBB! Set Up Your League</h2>
+                <p class="text-gray-400 text-sm mt-1">Connect your ESPN league to get started, or skip to practice.</p>
+            </div>
+            <div class="p-6 space-y-5">
+                <!-- League Name -->
+                <div>
+                    <label for="wizard-league-name" class="block text-sm font-medium text-gray-300 mb-1">League Name</label>
+                    <input id="wizard-league-name" type="text" placeholder="My Fantasy League"
+                        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
+                </div>
+                <!-- ESPN League ID -->
+                <div>
+                    <label for="wizard-espn-league-id" class="block text-sm font-medium text-gray-300 mb-1">ESPN League ID</label>
+                    <input id="wizard-espn-league-id" type="number" placeholder="e.g. 123456"
+                        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
+                    <p class="text-gray-500 text-xs mt-1">Find it in your ESPN league URL: <span class="text-gray-400 font-mono">fantasy.espn.com/baseball/league?leagueId=<span class="text-blue-400">XXXXXX</span></span></p>
+                </div>
+                <!-- ESPN Credentials (optional) -->
+                <div class="border border-gray-700 rounded p-4 space-y-3">
+                    <p class="text-sm font-medium text-gray-300">ESPN Credentials <span class="text-gray-500 font-normal">(optional — only needed for private leagues)</span></p>
+                    <div>
+                        <label for="wizard-espn-s2" class="block text-xs text-gray-400 mb-1">ESPN S2 Cookie</label>
+                        <input id="wizard-espn-s2" type="password" placeholder="espn_s2 value"
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div>
+                        <label for="wizard-swid" class="block text-xs text-gray-400 mb-1">SWID Cookie</label>
+                        <input id="wizard-swid" type="password" placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500" />
+                    </div>
+                </div>
+                <!-- Error message -->
+                <p id="wizard-error" class="text-red-400 text-sm hidden"></p>
+            </div>
+            <div class="p-6 border-t border-gray-700 flex justify-between items-center">
+                <button onclick="skipSetupWizard()" class="text-gray-400 hover:text-gray-200 text-sm transition-colors">Skip for now</button>
+                <button onclick="saveSetupWizard()" id="wizard-save-btn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded transition-colors">
+                    Save &amp; Continue
+                </button>
             </div>
         </div>
     </div>

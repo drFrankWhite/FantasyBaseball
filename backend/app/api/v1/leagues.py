@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.database import get_db
 from app.models import League, Team
-from app.schemas.league import LeagueCreate, LeagueResponse, TeamResponse
+from app.schemas.league import LeagueCreate, LeagueUpdate, LeagueResponse, TeamResponse
 from app.utils import sanitize_error_message
 
 router = APIRouter()
@@ -121,6 +121,30 @@ async def delete_league(
     await db.commit()
 
     return {"status": "deleted", "league_id": league_id}
+
+
+@router.patch("/{league_id}")
+async def update_league(
+    league_id: int,
+    data: LeagueUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a league's name, ESPN league ID, and/or year."""
+    league = await db.get(League, league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+
+    if data.name is not None:
+        league.name = data.name
+    if data.espn_league_id is not None:
+        league.espn_league_id = data.espn_league_id
+    if data.year is not None:
+        league.year = data.year
+
+    await db.commit()
+    await db.refresh(league)
+
+    return {"status": "updated", "league_id": league_id, "name": league.name, "espn_league_id": league.espn_league_id}
 
 
 class ESPNCredentialsOptional(BaseModel):

@@ -14,6 +14,12 @@ class LeagueCreate(LeagueBase):
     swid: Optional[str] = None
 
 
+class LeagueUpdate(BaseModel):
+    name: Optional[str] = None
+    espn_league_id: Optional[int] = None
+    year: Optional[int] = None
+
+
 class TeamResponse(BaseModel):
     id: int
     espn_team_id: int

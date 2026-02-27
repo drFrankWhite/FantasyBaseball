@@ -211,13 +211,12 @@ async function initApp() {
     // Try to load existing league or create default
     try {
         const leagues = await fetchAPI('/leagues/');
+        let leagueData;
         if (leagues.length > 0) {
-            currentLeagueId = leagues[0].id;
-            document.getElementById('league-name').textContent = leagues[0].name;
-            checkCredentialStatus(leagues[0]);
+            leagueData = leagues[0];
         } else {
             // Create default league (configure via Mock Draft setup)
-            const league = await fetchAPI('/leagues/', {
+            leagueData = await fetchAPI('/leagues/', {
                 method: 'POST',
                 body: JSON.stringify({
                     espn_league_id: 0,
@@ -225,9 +224,14 @@ async function initApp() {
                     name: 'My Fantasy League'
                 })
             });
-            currentLeagueId = league.id;
-            document.getElementById('league-name').textContent = league.name;
-            checkCredentialStatus(league);
+        }
+        currentLeagueId = leagueData.id;
+        document.getElementById('league-name').textContent = leagueData.name;
+        document.getElementById('league-name-badge').classList.toggle('hidden', leagueData.espn_league_id === 0);
+        checkCredentialStatus(leagueData);
+
+        if (leagueData.espn_league_id === 0 && !localStorage.getItem('setupSkipped')) {
+            showSetupWizard(leagueData);
         }
     } catch (error) {
         console.error('Failed to initialize league:', error);
@@ -5642,6 +5646,81 @@ function showSettingsModal() {
 
     modal.classList.remove('hidden');
 }
+
+// ─── First-Run Setup Wizard ────────────────────────────────────────────────
+
+function showSetupWizard(leagueData) {
+    const modal = document.getElementById('setup-wizard-modal');
+    if (!modal) return;
+    // Pre-fill league name if it's already set to something meaningful
+    if (leagueData && leagueData.name) {
+        document.getElementById('wizard-league-name').value = leagueData.name;
+    }
+    modal.classList.remove('hidden');
+}
+
+function skipSetupWizard() {
+    localStorage.setItem('setupSkipped', 'true');
+    document.getElementById('setup-wizard-modal').classList.add('hidden');
+}
+
+async function saveSetupWizard() {
+    if (!currentLeagueId) return;
+
+    const nameInput = document.getElementById('wizard-league-name').value.trim();
+    const leagueIdInput = parseInt(document.getElementById('wizard-espn-league-id').value, 10);
+    const espnS2 = document.getElementById('wizard-espn-s2').value.trim();
+    const swid = document.getElementById('wizard-swid').value.trim();
+    const errorEl = document.getElementById('wizard-error');
+    const saveBtn = document.getElementById('wizard-save-btn');
+
+    errorEl.classList.add('hidden');
+
+    if (!leagueIdInput || leagueIdInput <= 0) {
+        errorEl.textContent = 'Please enter a valid ESPN League ID.';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    try {
+        const patchBody = { espn_league_id: leagueIdInput };
+        if (nameInput) patchBody.name = nameInput;
+
+        const updated = await fetchAPI(`/leagues/${currentLeagueId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(patchBody)
+        });
+
+        // Update header league name
+        const displayName = updated.name || nameInput || 'My Fantasy League';
+        document.getElementById('league-name').textContent = displayName;
+        document.getElementById('league-name-badge').classList.remove('hidden');
+
+        // Save credentials if provided
+        if (espnS2 && swid) {
+            await fetchAPI(`/leagues/${currentLeagueId}/credentials`, {
+                method: 'POST',
+                body: JSON.stringify({ espn_s2: espnS2, swid: swid })
+            });
+            // Trigger ESPN sync
+            fetchAPI(`/leagues/${currentLeagueId}/sync`, { method: 'POST' }).catch(() => {});
+        }
+
+        localStorage.removeItem('setupSkipped');
+        document.getElementById('setup-wizard-modal').classList.add('hidden');
+    } catch (err) {
+        errorEl.textContent = 'Failed to save. Please try again.';
+        errorEl.classList.remove('hidden');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save & Continue';
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 
 function closeSettingsModal() {
     document.getElementById('settings-modal').classList.add('hidden');

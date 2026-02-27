@@ -29,7 +29,7 @@ py --version        # Windows
 
 ### Git (optional)
 
-Only needed if you want to clone the repository. Otherwise you can [download a ZIP](https://github.com/your-repo/FBB/archive/refs/heads/main.zip) instead.
+Only needed if you want to clone the repository. Otherwise you can [download a ZIP](https://github.com/drFrankWhite/FantasyBaseball/archive/refs/heads/main.zip) instead.
 
 - **Mac**: `brew install git` or install Xcode Command Line Tools: `xcode-select --install`
 - **Linux**: `sudo apt install git` or `sudo dnf install git`
@@ -45,7 +45,7 @@ No other technical knowledge is required. The app runs entirely on your computer
 
 **Option A — Git clone (recommended):**
 ```bash
-git clone https://github.com/your-repo/FBB.git
+git clone https://github.com/drFrankWhite/FantasyBaseball.git
 cd FBB
 ```
 
