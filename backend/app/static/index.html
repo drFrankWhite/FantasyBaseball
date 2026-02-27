@@ -984,6 +984,25 @@
         </div>
     </div>
 
+    <!-- Resume Draft Session Dialog -->
+    <div id="resume-session-modal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="resume-session-modal-title">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-sm mx-4 border border-gray-700">
+            <div class="p-6">
+                <h2 id="resume-session-modal-title" class="text-lg font-bold text-amber-400 mb-2">Unfinished Draft Session</h2>
+                <p class="text-gray-300 text-sm font-semibold" id="resume-session-name"></p>
+                <p class="text-gray-400 text-sm mb-6" id="resume-session-pick"></p>
+                <div class="flex gap-3">
+                    <button onclick="endSessionFromDialog()" class="flex-1 py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium text-sm border border-gray-600 transition-all">
+                        End Session
+                    </button>
+                    <button onclick="resumeDraftSession()" class="flex-1 py-2 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-lg font-bold text-sm shadow-lg transition-all">
+                        Resume Draft
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Draft Board Modal -->
     <div id="draft-board-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50">
         <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-6xl mx-4 border border-gray-700 max-h-[90vh] flex flex-col">

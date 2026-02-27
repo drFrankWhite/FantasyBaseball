@@ -4349,49 +4349,78 @@ async function startDraftSession() {
     }
 }
 
+// Populate module-level state from an active-session API response
+function _applySessionState(response) {
+    draftSessionId = response.session_id;
+    draftSessionName = response.session_name;
+    draftNumTeams = response.num_teams;
+    draftUserPosition = response.user_draft_position;
+    draftCurrentPick = response.current_pick;
+    draftCurrentRound = response.current_round;
+    draftTeamOnClock = response.team_on_clock;
+    draftIsUserPick = response.is_user_pick;
+    draftTeams = response.teams || [];
+    updateKeeperTeamSelector();
+    canUndo = response.can_undo;
+    canRedo = response.can_redo;
+
+    // If no teams from API, create default ones
+    if (draftTeams.length === 0) {
+        for (let i = 1; i <= draftNumTeams; i++) {
+            draftTeams.push({
+                id: null,
+                name: `Team ${i}`,
+                draft_position: i,
+                is_user_team: i === draftUserPosition
+            });
+        }
+    }
+}
+
 // Check for active session on page load
 async function checkActiveSession() {
     if (!currentLeagueId) return;
 
     try {
         const response = await fetchAPI(`/draft/session/active?league_id=${currentLeagueId}`);
+        if (!response.is_active) return;
 
-        if (response.is_active) {
-            draftSessionId = response.session_id;
-            draftSessionName = response.session_name;
-            draftNumTeams = response.num_teams;
-            draftUserPosition = response.user_draft_position;
-            draftCurrentPick = response.current_pick;
-            draftCurrentRound = response.current_round;
-            draftTeamOnClock = response.team_on_clock;
-            draftIsUserPick = response.is_user_pick;
-            draftTeams = response.teams || [];
-            updateKeeperTeamSelector();
-            canUndo = response.can_undo;
-            canRedo = response.can_redo;
+        // Populate state so the bar is ready if the user chooses Resume
+        _applySessionState(response);
 
-            // If no teams from API, create default ones
-            if (draftTeams.length === 0) {
-                for (let i = 1; i <= draftNumTeams; i++) {
-                    draftTeams.push({
-                        id: null,
-                        name: `Team ${i}`,
-                        draft_position: i,
-                        is_user_team: i === draftUserPosition
-                    });
-                }
-            }
+        // Ask the user instead of silently restoring
+        showResumeSessionDialog(response.session_name, response.current_pick);
 
-            showDraftSessionBar();
-            updateOnTheClockDisplay();
-            updateUndoRedoButtons();
-            updateResetButtonState();
-
-            console.log('Restored active draft session:', draftSessionName);
-        }
     } catch (error) {
         console.error('Failed to check active session:', error);
     }
+}
+
+// Show the resume-or-end dialog
+function showResumeSessionDialog(sessionName, currentPick) {
+    document.getElementById('resume-session-name').textContent = sessionName || 'Draft Session';
+    document.getElementById('resume-session-pick').textContent = `Pick ${currentPick}`;
+    document.getElementById('resume-session-modal').classList.remove('hidden');
+}
+
+function closeResumeSessionDialog() {
+    document.getElementById('resume-session-modal').classList.add('hidden');
+}
+
+// Resume button in the resume dialog
+function resumeDraftSession() {
+    closeResumeSessionDialog();
+    showDraftSessionBar();
+    updateOnTheClockDisplay();
+    updateUndoRedoButtons();
+    updateResetButtonState();
+    console.log('Resumed active draft session:', draftSessionName);
+}
+
+// End session button in the resume dialog (no second confirm needed — user already chose)
+async function endSessionFromDialog() {
+    closeResumeSessionDialog();
+    await _doEndSession();
 }
 
 // Update session state (pick count, undo/redo availability)
@@ -4880,18 +4909,8 @@ function showNotification(message, type = 'info') {
     }
 }
 
-// End draft session with confirmation
-async function confirmEndSession() {
-    if (!draftSessionId) return;
-
-    const confirmed = confirm(
-        `End draft session "${draftSessionName}"?\n\n` +
-        `You will be able to reset the draft board after this.\n` +
-        `Pick history will be preserved.`
-    );
-
-    if (!confirmed) return;
-
+// Shared end-session logic (no confirm dialog)
+async function _doEndSession() {
     try {
         const response = await fetchAPI(
             `/draft/session/end?session_id=${draftSessionId}`,
@@ -4920,6 +4939,21 @@ async function confirmEndSession() {
         console.error('Failed to end session:', error);
         alert('Failed to end session: ' + (error.message || 'Unknown error'));
     }
+}
+
+// End draft session with confirmation
+async function confirmEndSession() {
+    if (!draftSessionId) return;
+
+    const confirmed = confirm(
+        `End draft session "${draftSessionName}"?\n\n` +
+        `You will be able to reset the draft board after this.\n` +
+        `Pick history will be preserved.`
+    );
+
+    if (!confirmed) return;
+
+    await _doEndSession();
 }
 
 // Show session history modal
