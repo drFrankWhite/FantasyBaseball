@@ -14,27 +14,37 @@ class CategoryCalculator:
     Specific to 6x6 H2H categories league format.
     """
 
-    # League average targets (approximations for a 12-team league)
-    # These can be adjusted based on actual league data
+    # Per-team competitive targets calibrated to 2025-era H2H median (12-team baseline).
+    # Counting stats scale with league size via get_scaled_targets(); rate stats are fixed.
     LEAGUE_TARGETS = {
         # Batting (season totals for a roster)
-        "runs": 900,
-        "hr": 280,
-        "rbi": 850,
-        "sb": 120,
+        "runs": 800,
+        "hr": 220,
+        "rbi": 790,
+        "sb": 60,
         "avg": 0.265,
         "ops": 0.780,
         # Pitching
-        "wins": 85,
-        "strikeouts": 1350,
+        "wins": 80,
+        "strikeouts": 1250,
         "era": 3.70,
         "whip": 1.18,
-        "saves": 70,
-        "quality_starts": 95,
+        "saves": 50,
+        "quality_starts": 80,
     }
 
     # Categories where lower is better
     INVERTED_CATEGORIES = ["era", "whip"]
+
+    # Human-readable abbreviations for summary text and labels
+    CATEGORY_DISPLAY = {
+        "quality_starts": "QS",
+        "strikeouts": "K",
+        "wins": "W",
+        "saves": "SV",
+        "runs": "R",
+    }
+
     CATEGORY_POSITION_HINTS = {
         "runs": "OF/SS/2B",
         "hr": "1B/OF/3B",
@@ -70,7 +80,8 @@ class CategoryCalculator:
                 if projected == 0:
                     strengths[category] = 50  # No data
                 else:
-                    # ERA of 3.00 = 100, 5.00 = 0
+                    # Linear scale centered at target (strength=50 at target).
+                    # Each 0.04 ERA above/below target shifts strength ±1 point.
                     diff = target - projected
                     strengths[category] = max(0, min(100, 50 + (diff * 25)))
             else:
@@ -92,6 +103,7 @@ class CategoryCalculator:
         Returns sorted list of needs with priority.
         """
         strengths = await self.get_team_strengths(db, team_id)
+        team_totals = await self._aggregate_team_projections(db, team_id)
 
         needs = []
         for category, strength in strengths.items():
@@ -100,7 +112,8 @@ class CategoryCalculator:
                 target = self.LEAGUE_TARGETS[category]
 
                 if category in self.INVERTED_CATEGORIES:
-                    gap = 0  # Gap calculation is different for ratios
+                    projected = team_totals.get(category, 0)
+                    gap = round(projected - target, 3) if projected > 0 else 0.0
                 else:
                     gap = target * (1 - strength / 100)
 
@@ -129,22 +142,45 @@ class CategoryCalculator:
         # Calculate player's contribution
         player_contrib = self._get_player_contribution(player)
 
+        # Raw team totals needed for ERA/WHIP weighted-average simulation
+        raw_totals = await self._aggregate_team_projections(db, team_id)
+
         # Calculate new strengths with player added
         projected_strengths = {}
         for category in self.LEAGUE_TARGETS:
             current = current_strengths.get(category, 50)
-            contribution = player_contrib.get(category, 0)
             target = self.LEAGUE_TARGETS[category]
 
-            if category in self.INVERTED_CATEGORIES:
-                # For ratios, this is more complex
-                # Simplified: assume the player helps proportionally
-                projected_strengths[category] = current  # Placeholder
+            if category == "era":
+                current_ip = raw_totals.get("_era_ip", 0)
+                current_er = raw_totals.get("_era_er", 0)
+                player_ip = player_contrib.get("ip", 0)
+                player_era = player_contrib.get("era", 0)
+                if player_ip > 0 and player_era > 0:
+                    new_ip = current_ip + player_ip
+                    new_er = current_er + player_era * player_ip / 9
+                    new_era = new_er * 9 / new_ip
+                    projected_strengths[category] = max(0.0, min(100.0, 50 + (target - new_era) * 25))
+                else:
+                    projected_strengths[category] = current
+            elif category == "whip":
+                current_ip = raw_totals.get("_whip_ip", 0)
+                current_bbh = raw_totals.get("_whip_bbh", 0)
+                player_ip = player_contrib.get("ip", 0)
+                player_whip = player_contrib.get("whip", 0)
+                if player_ip > 0 and player_whip > 0:
+                    new_ip = current_ip + player_ip
+                    new_bbh = current_bbh + player_whip * player_ip
+                    new_whip = new_bbh / new_ip
+                    projected_strengths[category] = max(0.0, min(100.0, 50 + (target - new_whip) * 25))
+                else:
+                    projected_strengths[category] = current
             else:
+                contribution = player_contrib.get(category, 0)
                 # Add contribution as percentage of target
                 if target > 0:
                     added_strength = (contribution / target) * 100
-                    projected_strengths[category] = min(100, current + added_strength)
+                    projected_strengths[category] = min(100.0, current + added_strength)
                 else:
                     projected_strengths[category] = current
 
@@ -216,14 +252,14 @@ class CategoryCalculator:
             totals["saves"] += contrib.get("saves", 0)
             totals["quality_starts"] += contrib.get("quality_starts", 0)
 
-            # For rate stats, we need to weight by PA/IP
-            if contrib.get("avg", 0) > 0:
-                pa = contrib.get("pa", 500)
+            # For rate stats, weight by PA/IP.
+            # Skip players with no PA data to avoid contaminating the weighted average.
+            pa = contrib.get("pa", 0)
+            if contrib.get("avg", 0) > 0 and pa > 0:
                 totals["avg_sum"] += contrib["avg"] * pa
                 totals["avg_count"] += pa
 
-            if contrib.get("ops", 0) > 0:
-                pa = contrib.get("pa", 500)
+            if contrib.get("ops", 0) > 0 and pa > 0:
                 totals["ops_sum"] += contrib["ops"] * pa
                 totals["ops_count"] += pa
 
@@ -253,6 +289,11 @@ class CategoryCalculator:
             "whip": totals["whip_bbh"] / totals["whip_ip"] if totals["whip_ip"] > 0 else 0,
             "saves": totals["saves"],
             "quality_starts": totals["quality_starts"],
+            # Raw pitching intermediates used by simulate_pick for rate-stat simulation
+            "_era_ip": totals["era_ip"],
+            "_era_er": totals["era_er"],
+            "_whip_ip": totals["whip_ip"],
+            "_whip_bbh": totals["whip_bbh"],
         }
 
         return final
@@ -322,10 +363,12 @@ class CategoryCalculator:
     ) -> Dict[str, float]:
         """
         Get planner targets scaled for league size.
-        Counting stats scale linearly from 12-team baseline.
-        Ratio categories remain fixed unless explicitly overridden.
+        Counting stats scale inversely with team count (fewer teams → stronger rosters
+        → higher per-team targets). Rate categories remain fixed unless overridden.
         """
-        scale = max(num_teams, 1) / 12.0
+        # Shallower leagues have stronger talent per roster, so per-team counting
+        # stat targets are higher. E.g. 10-team: scale=1.2; 14-team: scale=0.86.
+        scale = 12.0 / max(num_teams, 1)
         overrides = target_overrides or {}
         targets: Dict[str, float] = {}
 
@@ -369,7 +412,7 @@ class CategoryCalculator:
             min(100.0, (team_picks_made / team_pick_target) * 100.0)
             if team_pick_target > 0 else 0.0
         )
-        completion_ratio = max(completion_pct / 100.0, 0.01)
+        completion_ratio = completion_pct / 100.0
 
         projected_final: Dict[str, float] = {}
         needs: List[Dict[str, Any]] = []
@@ -380,19 +423,23 @@ class CategoryCalculator:
             if category in self.INVERTED_CATEGORIES:
                 # Ratios are already full-season quality proxies; keep stable.
                 projected = current if current > 0 else target
-                gap = projected - target  # positive = behind (worse than target)
+                gap = projected - target  # positive = worse than target
                 deficit_pct = max(gap, 0.0) / max(target, 0.001)
             else:
-                projected = current / completion_ratio
+                # Avoid extrapolation blowup early in the draft.
+                if completion_ratio < 0.05 or current == 0:
+                    projected = current
+                else:
+                    projected = current / completion_ratio
                 gap = target - projected  # positive = behind
                 deficit_pct = max(gap, 0.0) / max(target, 0.001)
 
-            if deficit_pct <= 0.03:
-                status = "on_track"
-            elif gap > 0:
-                status = "behind"
-            else:
+            if gap <= 0:
                 status = "ahead"
+            elif deficit_pct <= 0.03:
+                status = "on_track"
+            else:
+                status = "behind"
 
             projected_final[category] = projected
             needs.append({
@@ -410,9 +457,12 @@ class CategoryCalculator:
         focus_categories = [f["category"] for f in focus_plan]
 
         if focus_categories:
-            summary = f"Biggest category gaps: {', '.join(c.upper() for c in focus_categories)}."
+            summary = f"Biggest category gaps: {', '.join(self._display_name(c) for c in focus_categories)}."
         else:
             summary = "Category build is balanced. Stay flexible and draft best value."
+
+        rate_stats_reliable = completion_pct >= 25.0
+        team_position_counts = await self._get_team_position_counts(db, team_id)
 
         return {
             "completion_pct": round(completion_pct, 1),
@@ -425,6 +475,8 @@ class CategoryCalculator:
             "focus_categories": focus_categories,
             "focus_plan": focus_plan,
             "summary": summary,
+            "rate_stats_reliable": rate_stats_reliable,
+            "team_position_counts": team_position_counts,
         }
 
     def _build_focus_plan(
@@ -485,3 +537,27 @@ class CategoryCalculator:
             })
 
         return plan
+
+    def _display_name(self, category: str) -> str:
+        """Human-readable abbreviation for a category key."""
+        return self.CATEGORY_DISPLAY.get(category, category.upper())
+
+    async def _get_team_position_counts(
+        self,
+        db: AsyncSession,
+        team_id: int,
+    ) -> Dict[str, int]:
+        """Count drafted players by primary position for the given team."""
+        picks_query = (
+            select(DraftPick)
+            .options(selectinload(DraftPick.player))
+            .where(DraftPick.team_id == team_id)
+        )
+        result = await db.execute(picks_query)
+        picks = result.scalars().all()
+        counts: Dict[str, int] = {}
+        for pick in picks:
+            if pick.player:
+                pos = pick.player.primary_position or "UTIL"
+                counts[pos] = counts.get(pos, 0) + 1
+        return counts

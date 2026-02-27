@@ -221,12 +221,12 @@ class TestTeamStrengths:
 
     async def test_batting_stats_scale_proportionally(self, db_session):
         """
-        Player with hr == LEAGUE_TARGETS['hr'] (280) → hr_strength == 100.
+        Player with hr == LEAGUE_TARGETS['hr'] → hr_strength == 100.
         Verifies the (projected / target) * 100 scaling formula.
         """
         league = await _get_league(db_session)
         team = await _add_team(db_session, league.id)
-        await _add_player_with_pick(db_session, team.id, hr=280.0)
+        await _add_player_with_pick(db_session, team.id, hr=float(CategoryCalculator.LEAGUE_TARGETS["hr"]))
 
         calc = CategoryCalculator()
         strengths = await calc.get_team_strengths(db_session, team.id)
@@ -313,20 +313,21 @@ class TestTeamNeeds:
         55 ≤ strength < 70  → 'low'
 
         Verified via three teams with precisely-chosen HR projections.
+        HR target is now 220 (updated from 280).
         """
         league = await _get_league(db_session)
 
-        # Team A: hr=106 → strength = (106/280)*100 ≈ 37.9 → "high"
+        # Team A: hr=83 → strength = (83/220)*100 ≈ 37.7 → "high"
         team_a = await _add_team(db_session, league.id, espn_id=101, name="High Team")
-        await _add_player_with_pick(db_session, team_a.id, src_name="SrcA", hr=106.0)
+        await _add_player_with_pick(db_session, team_a.id, src_name="SrcA", hr=83.0)
 
-        # Team B: hr=140 → strength = (140/280)*100 = 50.0 → "medium"
+        # Team B: hr=110 → strength = (110/220)*100 = 50.0 → "medium"
         team_b = await _add_team(db_session, league.id, espn_id=102, name="Medium Team")
-        await _add_player_with_pick(db_session, team_b.id, src_name="SrcB", hr=140.0)
+        await _add_player_with_pick(db_session, team_b.id, src_name="SrcB", hr=110.0)
 
-        # Team C: hr=170 → strength = (170/280)*100 ≈ 60.7 → "low"
+        # Team C: hr=133 → strength = (133/220)*100 ≈ 60.5 → "low"
         team_c = await _add_team(db_session, league.id, espn_id=103, name="Low Team")
-        await _add_player_with_pick(db_session, team_c.id, src_name="SrcC", hr=170.0)
+        await _add_player_with_pick(db_session, team_c.id, src_name="SrcC", hr=133.0)
 
         calc = CategoryCalculator()
 
@@ -352,13 +353,13 @@ class TestTeamNeeds:
         team = await _add_team(db_session, league.id)
         await _add_player_with_pick(
             db_session, team.id,
-            # Counting stats at 100 % of targets
-            hr=280.0, runs=900.0, rbi=850.0, sb=120.0,
+            # Counting stats at 100 % of updated targets
+            hr=220.0, runs=800.0, rbi=790.0, sb=60.0,
             # Rate stats at targets (weighted by PA/IP)
             avg=0.265, pa=500.0,
             ops=0.780,
             # Pitching counting stats
-            wins=85.0, strikeouts=1350.0, saves=70.0, quality_starts=95.0,
+            wins=80.0, strikeouts=1250.0, saves=50.0, quality_starts=80.0,
             # ERA well below target (3.70): strength = 80
             era=2.50, ip=150.0,
             # WHIP well below target (1.18): strength = 72
@@ -388,3 +389,135 @@ class TestTeamNeeds:
         assert era_need is not None, "ERA should appear in needs when ERA is worse than target"
         assert era_need["strength"] < 50.0
         assert era_need["priority"] == "high"
+
+
+# ===========================================================================
+# TestGetScaledTargets  (pure unit tests — no DB)
+# ===========================================================================
+
+class TestGetScaledTargets:
+    """Pure unit tests for CategoryCalculator.get_scaled_targets."""
+
+    def test_shallower_league_has_higher_counting_targets(self):
+        """Fewer teams → stronger rosters → higher per-team counting stat targets."""
+        calc = CategoryCalculator()
+        targets_10 = calc.get_scaled_targets(num_teams=10)
+        targets_12 = calc.get_scaled_targets(num_teams=12)
+        targets_14 = calc.get_scaled_targets(num_teams=14)
+
+        assert targets_10["hr"] > targets_12["hr"], "10-team league should have higher HR target"
+        assert targets_12["hr"] > targets_14["hr"], "12-team league should have higher HR target than 14-team"
+
+    def test_rate_stats_not_scaled(self):
+        """ERA and WHIP targets stay fixed regardless of league size."""
+        calc = CategoryCalculator()
+        for num_teams in (8, 10, 12, 14, 16):
+            targets = calc.get_scaled_targets(num_teams=num_teams)
+            assert targets["era"] == pytest.approx(CategoryCalculator.LEAGUE_TARGETS["era"])
+            assert targets["whip"] == pytest.approx(CategoryCalculator.LEAGUE_TARGETS["whip"])
+
+    def test_12_team_matches_baseline(self):
+        """12-team league returns targets equal to LEAGUE_TARGETS (scale = 1.0)."""
+        calc = CategoryCalculator()
+        targets = calc.get_scaled_targets(num_teams=12)
+        for category, base in CategoryCalculator.LEAGUE_TARGETS.items():
+            assert targets[category] == pytest.approx(base, rel=1e-6)
+
+    def test_custom_override_takes_priority(self):
+        """Explicit target_overrides bypass all scaling."""
+        calc = CategoryCalculator()
+        targets = calc.get_scaled_targets(num_teams=10, target_overrides={"hr": 999.0})
+        assert targets["hr"] == pytest.approx(999.0)
+
+
+# ===========================================================================
+# TestBuildCategoryPlannerStatus  (DB integration)
+# ===========================================================================
+
+class TestBuildCategoryPlannerStatus:
+    """Integration tests for status classification in build_category_planner."""
+
+    async def test_status_ahead_when_projected_exceeds_target(self, db_session):
+        """
+        A team with enough HR to project above the target must show 'ahead'.
+        Previously the 'ahead' branch was dead code and could never be reached.
+        """
+        league = await _get_league(db_session)
+        team = await _add_team(db_session, league.id)
+        # Seed HR above target (220). At 50% completion, projected = 150/0.5 = 300 > 220.
+        await _add_player_with_pick(db_session, team.id, hr=150.0, pa=600.0)
+
+        calc = CategoryCalculator()
+        result = await calc.build_category_planner(
+            db_session, team.id, num_teams=12,
+            team_picks_made=10, team_pick_target=20,
+        )
+
+        hr_need = next((n for n in result["needs"] if n["category"] == "hr"), None)
+        assert hr_need is not None
+        assert hr_need["status"] == "ahead", (
+            f"Expected 'ahead' but got '{hr_need['status']}' "
+            f"(projected={hr_need['projected_final']}, target={hr_need['target']})"
+        )
+
+    async def test_all_three_statuses_reachable(self, db_session):
+        """Verify 'ahead', 'on_track', and 'behind' can all appear in one planner run."""
+        league = await _get_league(db_session)
+        team = await _add_team(db_session, league.id)
+        # HR well above target → ahead; SB near target → on_track; wins 0 → behind
+        await _add_player_with_pick(
+            db_session, team.id,
+            hr=150.0, pa=600.0,  # HR: projected 300 >> target 220 → ahead
+            sb=8.0,              # SB: projected 16 vs target 60 → behind
+            wins=0.0,
+        )
+
+        calc = CategoryCalculator()
+        result = await calc.build_category_planner(
+            db_session, team.id, num_teams=12,
+            team_picks_made=10, team_pick_target=20,
+        )
+
+        statuses = {n["category"]: n["status"] for n in result["needs"]}
+        assert "ahead" in statuses.values(), "At least one category should be 'ahead'"
+        assert "behind" in statuses.values(), "At least one category should be 'behind'"
+
+
+# ===========================================================================
+# TestSimulatePickRateStat  (DB integration)
+# ===========================================================================
+
+class TestSimulatePickRateStat:
+    """Integration tests for ERA/WHIP simulation in simulate_pick."""
+
+    async def test_era_change_is_not_placeholder_zero(self, db_session):
+        """
+        Adding a high-ERA pitcher must produce a non-zero ERA change.
+        Previously the simulation was a placeholder that always returned 0 change.
+        """
+        league = await _get_league(db_session)
+        team = await _add_team(db_session, league.id)
+        await _add_player_with_pick(db_session, team.id, src_name="Ace", era=2.50, ip=200.0)
+
+        calc = CategoryCalculator()
+        # New pitcher to simulate: high ERA
+        new_pitcher = _player_with_proj(era=5.00, ip=150.0)
+        impact = await calc.simulate_pick(db_session, team.id, new_pitcher)
+
+        assert impact["era"]["change"] != 0.0, "ERA change must be non-zero (was placeholder)"
+        assert impact["era"]["after"] < impact["era"]["before"], (
+            "ERA strength should decrease when adding a pitcher with ERA above team average"
+        )
+
+    async def test_good_era_pitcher_improves_strength(self, db_session):
+        """Adding a pitcher with better ERA than the team average should improve ERA strength."""
+        league = await _get_league(db_session)
+        team = await _add_team(db_session, league.id)
+        await _add_player_with_pick(db_session, team.id, src_name="Mid", era=4.50, ip=150.0)
+
+        calc = CategoryCalculator()
+        # Adding an ace should bring ERA strength up
+        ace = _player_with_proj(era=2.50, ip=200.0)
+        impact = await calc.simulate_pick(db_session, team.id, ace)
+
+        assert impact["era"]["change"] > 0.0, "ERA strength should increase when adding an ace"

@@ -873,56 +873,148 @@ function renderCategoryPlannerUnavailable(message = 'Planner unavailable') {
     `;
 }
 
+// Category display labels (Issue 15: fixes "QUALITY_STARTS" etc.)
+const CATEGORY_LABELS = {
+    quality_starts: 'QS', strikeouts: 'K', runs: 'R', hr: 'HR',
+    rbi: 'RBI', sb: 'SB', avg: 'AVG', ops: 'OPS',
+    wins: 'W', era: 'ERA', whip: 'WHIP', saves: 'SV',
+};
+function catLabel(c) { return CATEGORY_LABELS[c] || c.toUpperCase(); }
+
+// Ratio vs. counting stat formatting helpers (Issues 12, 13)
+const RATIO_CATS = new Set(['avg', 'ops', 'era', 'whip']);
+const INVERTED_CATS = new Set(['era', 'whip']);
+
+function formatCatValue(category, value) {
+    const n = Number(value);
+    return RATIO_CATS.has(category) ? n.toFixed(3) : Math.round(n).toLocaleString();
+}
+
+function formatCatGap(category, gap) {
+    const n = Number(gap);
+    if (INVERTED_CATS.has(category)) {
+        // positive gap = ERA/WHIP is above (worse than) target
+        return n > 0
+            ? `▲${Math.abs(n).toFixed(3)} over`
+            : `▼${Math.abs(n).toFixed(3)} under`;
+    }
+    return n > 0
+        ? `+${Math.round(n).toLocaleString()} short`
+        : `+${Math.abs(Math.round(n)).toLocaleString()} surplus`;
+}
+
+// Gain unit labels per category (Issue 12: estimated_gain context)
+const GAIN_UNITS = {
+    avg: 'avg pts', ops: 'ops pts', era: 'ERA impr.', whip: 'WHIP impr.',
+    runs: 'R', hr: 'HR', rbi: 'RBI', sb: 'SB',
+    wins: 'W', strikeouts: 'K', saves: 'SV', quality_starts: 'QS',
+};
+
 function renderCategoryPlanner() {
     const container = document.getElementById('planner-dashboard');
     if (!container || !categoryPlanner) return;
 
-    const focusCards = (categoryPlanner.focus_plan || []).map(focus => `
-        <div class="bg-gray-800/60 border border-gray-700 rounded-lg p-3">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-sm font-semibold text-amber-300">${focus.category.toUpperCase()}</span>
-                <span class="text-xs text-red-300">${Number(focus.deficit_pct).toFixed(1)}% deficit</span>
-            </div>
-            <p class="text-xs text-gray-400 mb-2">Priority positions: ${escapeHtml(focus.suggested_positions)}</p>
-            ${(focus.top_options || []).length > 0 ? `
-                <div class="space-y-1">
-                    ${(focus.top_options || []).map(o => `
+    const focusPlan = categoryPlanner.focus_plan || [];
+    const posHint = categoryPlanner.team_position_counts || {};
+
+    // Roster context: "3SP 2OF 1C …" (Issue 19)
+    const draftedSummary = Object.entries(posHint)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([pos, count]) => `${count}${pos}`)
+        .join(' ') || 'none yet';
+
+    // Focus cards — multi-column on wider screens (Issue 16)
+    const focusCards = focusPlan.map(focus => {
+        const gainUnit = GAIN_UNITS[focus.category] || '';
+        const optionsHtml = (focus.top_options || []).length > 0
+            ? `<div class="space-y-1">
+                ${(focus.top_options || []).map(o => {
+                    const gainDisplay = INVERTED_CATS.has(focus.category)
+                        ? `${Number(o.contribution).toFixed(2)} ${catLabel(focus.category)}`
+                        : `+${Math.round(o.estimated_gain)} ${gainUnit}`;
+                    return `
                         <div class="flex justify-between text-xs">
-                            <button onclick="showPlayerDetail(${o.player_id})" class="text-blue-300 hover:text-blue-200">
+                            <button onclick="showPlayerDetail(${o.player_id})" class="text-blue-300 hover:text-blue-200 text-left">
                                 ${escapeHtml(o.player_name)} (${escapeHtml(o.positions)})
                             </button>
-                            <span class="text-gray-400">+${o.estimated_gain}</span>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : '<p class="text-xs text-gray-500">No clear options in current player pool.</p>'}
-        </div>
-    `).join('');
+                            <span class="text-gray-400 ml-1 shrink-0">${gainDisplay}</span>
+                        </div>`;
+                }).join('')}
+               </div>`
+            : '<p class="text-xs text-gray-500">No clear options in current player pool.</p>';
 
-    const topNeedsRows = (categoryPlanner.needs || []).slice(0, 6).map(need => `
+        return `
+        <div class="bg-gray-800/60 border border-gray-700 rounded-lg p-3">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-sm font-semibold text-amber-300">${catLabel(focus.category)}</span>
+                <span class="text-xs text-red-300">${Number(focus.deficit_pct).toFixed(1)}% deficit</span>
+            </div>
+            <p class="text-xs text-gray-400 mb-1">Priority: ${escapeHtml(focus.suggested_positions)}</p>
+            <p class="text-xs text-gray-500 mb-2">Drafted: ${escapeHtml(draftedSummary)}</p>
+            ${optionsHtml}
+        </div>`;
+    }).join('');
+
+    // Only show focus section when there are actual deficits (Issue 17)
+    const hasBehind = (categoryPlanner.needs || []).some(n => n.status === 'behind');
+    const showFocusArea = focusPlan.length > 0;
+    const focusSection = showFocusArea
+        ? `<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">${focusCards}</div>`
+        : hasBehind
+            ? ''  // table below will show gaps
+            : '<p class="text-xs text-gray-500 mb-3">No major deficits — category build is balanced.</p>';
+
+    // Top needs table — only when there are deficits to show (Issue 17)
+    const topNeedsRows = (categoryPlanner.needs || []).slice(0, 6).map(need => {
+        const statusColor = need.status === 'behind' ? 'text-red-300' : need.status === 'ahead' ? 'text-emerald-300' : 'text-yellow-300';
+        const gapColor = need.gap > 0 ? 'text-red-300' : 'text-emerald-300';
+        return `
         <tr class="border-b border-gray-800">
-            <td class="py-1 text-xs font-medium ${need.status === 'behind' ? 'text-red-300' : 'text-emerald-300'}">${need.category.toUpperCase()}</td>
-            <td class="py-1 text-xs text-right text-gray-300">${need.projected_final}</td>
-            <td class="py-1 text-xs text-right text-gray-400">${need.target}</td>
-            <td class="py-1 text-xs text-right ${need.gap > 0 ? 'text-red-300' : 'text-emerald-300'}">${need.gap > 0 ? '+' : ''}${need.gap}</td>
-        </tr>
-    `).join('');
+            <td class="py-1 text-xs font-medium ${statusColor}">${catLabel(need.category)}</td>
+            <td class="py-1 text-xs text-right text-gray-300">${formatCatValue(need.category, need.projected_final)}</td>
+            <td class="py-1 text-xs text-right text-gray-400">${formatCatValue(need.category, need.target)}</td>
+            <td class="py-1 text-xs text-right ${gapColor}">${formatCatGap(need.category, need.gap)}</td>
+        </tr>`;
+    }).join('');
 
+    const showGapsTable = hasBehind || focusPlan.length > 0;
+
+    const gapsTableHtml = showGapsTable ? `
+        <div class="bg-gray-900/60 border border-gray-700 rounded-lg p-3 mb-3">
+            <p class="text-xs uppercase tracking-wide text-gray-500 mb-2">Category Pace</p>
+            <table class="w-full">
+                <thead>
+                    <tr class="text-[11px] text-gray-500">
+                        <th class="text-left py-1">Cat</th>
+                        <th class="text-right py-1">Proj</th>
+                        <th class="text-right py-1">Target</th>
+                        <th class="text-right py-1">Gap</th>
+                    </tr>
+                </thead>
+                <tbody>${topNeedsRows}</tbody>
+            </table>
+        </div>` : '';
+
+    // Custom Targets — collapsible, collapsed by default (Issue 18)
     const targetInputs = Object.entries(categoryPlanner.targets || {}).map(([category, value]) => {
-        const isRatio = ['avg', 'ops', 'era', 'whip'].includes(category);
+        const isRatio = RATIO_CATS.has(category);
         return `
             <label class="flex items-center justify-between gap-2 text-xs">
-                <span class="text-gray-400 w-10">${category.toUpperCase()}</span>
+                <span class="text-gray-400 w-10">${catLabel(category)}</span>
                 <input
                     data-category="${category}"
                     class="planner-target-input bg-gray-900 border border-gray-700 rounded px-2 py-1 w-24 text-right text-gray-200"
                     type="number"
                     step="${isRatio ? '0.001' : '1'}"
-                    value="${value}"
+                    value="${isRatio ? Number(value).toFixed(3) : Math.round(value)}"
                 />
-            </label>
-        `;
+            </label>`;
     }).join('');
+
+    // Rate stats caveat when fewer than 25% of picks made (Issue 20)
+    const rateStatCaveat = !categoryPlanner.rate_stats_reliable
+        ? `<p class="text-[11px] text-amber-500 mt-1">⚠ Rate stats (AVG, OPS, ERA, WHIP) may be skewed — fewer than 25% of picks made.</p>`
+        : '';
 
     container.innerHTML = `
         <div class="bg-gray-900/60 border border-indigo-700/40 rounded-lg p-3 mb-3">
@@ -935,41 +1027,62 @@ function renderCategoryPlanner() {
                 <div class="h-full bg-indigo-500" style="width: ${Math.max(2, categoryPlanner.completion_pct)}%"></div>
             </div>
             <p class="text-[11px] text-gray-500">${categoryPlanner.completion_pct}% draft completion</p>
+            ${rateStatCaveat}
         </div>
 
-        <div class="grid grid-cols-1 gap-3 mb-3">
-            ${focusCards || '<p class="text-xs text-gray-500">No major deficits detected.</p>'}
-        </div>
+        ${focusSection}
 
-        <div class="bg-gray-900/60 border border-gray-700 rounded-lg p-3 mb-3">
-            <p class="text-xs uppercase tracking-wide text-gray-500 mb-2">Top Category Gaps</p>
-            <table class="w-full">
-                <thead>
-                    <tr class="text-[11px] text-gray-500">
-                        <th class="text-left py-1">Cat</th>
-                        <th class="text-right py-1">Proj</th>
-                        <th class="text-right py-1">Target</th>
-                        <th class="text-right py-1">Gap</th>
-                    </tr>
-                </thead>
-                <tbody>${topNeedsRows}</tbody>
-            </table>
-        </div>
+        ${gapsTableHtml}
 
         <div class="bg-gray-900/60 border border-gray-700 rounded-lg p-3">
-            <div class="flex items-center justify-between mb-2">
+            <button onclick="togglePlannerTargets()"
+                    class="w-full flex items-center justify-between text-left py-1 hover:bg-gray-800/50 rounded"
+                    aria-expanded="false" aria-controls="planner-targets-content">
                 <p class="text-xs uppercase tracking-wide text-gray-500">Custom Targets</p>
-                <div class="flex gap-2">
-                    <button onclick="savePlannerTargets()" class="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded">Save</button>
-                    <button onclick="resetPlannerTargets()" class="text-xs px-2 py-1 border border-gray-600 hover:bg-gray-800 rounded">Reset</button>
+                <svg id="planner-targets-chevron" class="w-4 h-4 text-gray-500 transform transition-transform"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div id="planner-targets-content" class="section-content" style="display:none">
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">${targetInputs}</div>
+                <div class="flex gap-2 mt-3">
+                    <button id="planner-save-btn" onclick="savePlannerTargets()"
+                            class="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded">Save</button>
+                    <button id="planner-reset-btn" onclick="resetPlannerTargets()"
+                            class="text-xs px-2 py-1 border border-gray-600 hover:bg-gray-800 rounded">Reset</button>
                 </div>
+                <div id="planner-toast" class="hidden mt-2 text-xs"></div>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${targetInputs}</div>
         </div>
     `;
 }
 
+// Issue 18: Collapsible Custom Targets panel (toggled independently of toggleSection)
+function togglePlannerTargets() {
+    const content = document.getElementById('planner-targets-content');
+    const chevron = document.getElementById('planner-targets-chevron');
+    if (!content || !chevron) return;
+    const isHidden = content.style.display === 'none';
+    content.style.display = isHidden ? '' : 'none';
+    chevron.classList.toggle('rotate-180', isHidden);
+}
+
+// Issue 11: Save/Reset with loading state + toast feedback
+function showPlannerToast(message, isError = false) {
+    const toast = document.getElementById('planner-toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.className = `mt-2 text-xs ${isError ? 'text-red-400' : 'text-emerald-400'}`;
+    setTimeout(() => {
+        toast.textContent = '';
+        toast.className = 'hidden mt-2 text-xs';
+    }, 2500);
+}
+
 async function savePlannerTargets() {
+    const btn = document.getElementById('planner-save-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
     const inputs = document.querySelectorAll('.planner-target-input');
     const targets = {};
     inputs.forEach(input => {
@@ -979,19 +1092,33 @@ async function savePlannerTargets() {
             targets[category] = value;
         }
     });
-    categoryPlanner = await fetchAPI(withUserKey(`/recommendations/${currentLeagueId}/planner`), {
-        method: 'POST',
-        body: JSON.stringify({ targets }),
-    });
-    renderCategoryPlanner();
+    try {
+        categoryPlanner = await fetchAPI(withUserKey(`/recommendations/${currentLeagueId}/planner`), {
+            method: 'POST',
+            body: JSON.stringify({ targets }),
+        });
+        renderCategoryPlanner();
+        showPlannerToast('Targets saved.');
+    } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+        showPlannerToast('Save failed. Try again.', true);
+    }
 }
 
 async function resetPlannerTargets() {
-    categoryPlanner = await fetchAPI(withUserKey(`/recommendations/${currentLeagueId}/planner`), {
-        method: 'POST',
-        body: JSON.stringify({ targets: {} }),
-    });
-    renderCategoryPlanner();
+    const btn = document.getElementById('planner-reset-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Resetting…'; }
+    try {
+        categoryPlanner = await fetchAPI(withUserKey(`/recommendations/${currentLeagueId}/planner`), {
+            method: 'POST',
+            body: JSON.stringify({ targets: {} }),
+        });
+        renderCategoryPlanner();
+        showPlannerToast('Targets reset to defaults.');
+    } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Reset'; }
+        showPlannerToast('Reset failed. Try again.', true);
+    }
 }
 
 // Load scarcity data
