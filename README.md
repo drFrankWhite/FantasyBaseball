@@ -169,13 +169,6 @@ Five recommendation types tailored to your draft situation:
 | **Prospect Picks** | Top prospects with scouting grades, ETA, and keeper value |
 | **Position-Aware** | Factoring in scarcity and your roster composition |
 
-Recommendations are scored using a composite algorithm:
-- Rank score (30%): Consensus ranking quality
-- Risk score (20%): Inverse of risk assessment
-- Projection quality (20%): Multi-source projection agreement
-- Source consensus (10%): Ranking variance across experts
-- Position need (20%): Unfilled roster slots
-
 ### Keeper League Support
 
 Full keeper-league workflow built in:
@@ -189,9 +182,7 @@ Full keeper-league workflow built in:
 
 Value Over Replacement Player (VORP) calculation for every eligible player:
 
-- **Z-Score Normalization**: Each projection stat is normalized against the pool of draftable players, then summed into a single value score
-- **Per-Position Replacement Level**: Replacement level is set at the last "startable" player at each position (e.g., the 12th catcher in a 12-team league), not a global average
-- **Surplus Value**: `surplus = player_z_score - replacement_z_score` — positive means above replacement, negative means below
+- **Surplus Value**: Positive means above replacement, negative means below — calculated per position, not against a global average
 - **Sortable Column**: The player list includes a VORP/Surplus column that can be sorted to find the highest-value available player at any position
 
 ### Player Comparison Tool
@@ -245,40 +236,11 @@ Full draft tracking with history:
 
 ### Risk Scoring Algorithm
 
-Players are classified as **Safe** (< 30), **Moderate** (30-60), or **Risky** (> 60) based on six weighted factors:
-
-| Factor | Weight | Description |
-|--------|--------|-------------|
-| Ranking Variance | 25% | Standard deviation across sources with tier adjustments |
-| Injury History | 25% | Current IL status (IL-60: 80, IL-10: 50, DTD: 30) + news penalty |
-| Experience | 15% | Career PA/IP thresholds (proven: 1100 PA / 340 IP) |
-| Projection Variance | 15% | Coefficient of variation across projection systems |
-| Age Risk | 10% | Position-adjusted decline curves (hitter peak: 27, pitcher: 26) |
-| ADP vs ECR | 10% | Market vs expert disconnect (3x multiplier) |
-
-**Tier Adjustments**:
-- Elite players (rank ≤ 25): 0.7x variance penalty
-- Late-round (rank ≥ 100): 1.1x variance penalty
+Players are scored across six factors — ranking variance, injury history, experience, projection variance, age risk, and ADP vs ECR — and classified as **Safe** (< 30), **Moderate** (30–60), or **Risky** (> 60).
 
 ### Position Scarcity System
 
-Dynamic scarcity tracking based on draft position supply:
-
-**Base Scarcity Multipliers**:
-| Position | Multiplier | Rationale |
-|----------|------------|-----------|
-| C | 1.35 | Only ~15 quality starters |
-| SS | 1.20 | Premium position |
-| SP | 1.15 | Workload concerns |
-| 2B | 1.10 | Limited elite options |
-| 3B | 1.05 | Slightly shallow |
-| OF | 0.95 | Deep position |
-| 1B | 0.90 | Very deep |
-| RP | 0.85 | Easily replaced |
-
-**Dynamic Adjustment**: Supply ratio calculated against expected starters per position, adjusting multipliers as draft progresses.
-
-**Roster Need Score**: Calculated as `(unfilled_slots / total_slots) * 100` per position.
+Dynamic scarcity tracking that adjusts throughout the draft as positions are filled. Catcher and shortstop are weighted most heavily as the shallowest positions; relief pitching and first base the least. Roster need is factored in per position based on your unfilled slots.
 
 ### Player Tiers
 
@@ -299,15 +261,6 @@ Tier badges appear on player cards and are filterable in the player list.
 
 Comprehensive prospect analysis with:
 
-**5-Factor Risk Assessment**:
-| Factor | Weight | Description |
-|--------|--------|-------------|
-| Hit Tool | 35% | 20-80 grade converted to risk (80 = 0 risk) |
-| Age-Relative | 15% | Comparison to expected age by level |
-| Position Bust Rate | 15% | Historical bust rates (C: 65%, SP: 55%, SS: 40%) |
-| Pitcher Penalty | 20% | Additional 25 × 1.25 risk for pitchers |
-| Injury History | 15% | IL history impact |
-
 **Scouting Grades** (20-80 scale):
 - Hit, Power, Speed, Arm, Field tools
 - Future Value (overall ceiling)
@@ -320,30 +273,17 @@ Comprehensive prospect analysis with:
 
 ### Pick Prediction (Monte Carlo Simulation)
 
-Predict player availability using statistical simulation:
-
-- **Simulations**: 1,000 - 10,000 (default: 5,000)
-- **Volatility**: Derived from ECR range or ADP × 15%
-- **Output**: Probability, expected draft position, verdict
-
-**Verdicts**:
-- ≥ 70%: "Likely Available"
-- 30-70%: "Risky"
-- < 30%: "Unlikely"
+Predict player availability at your next pick using statistical simulation. Each player returns a probability and one of three verdicts: **Likely Available**, **Risky**, or **Unlikely**.
 
 ### Value Classification
 
-Identify sleepers and bust risks:
+Identify sleepers and bust risks based on the gap between ADP and expert consensus rankings:
 
-| Classification | Threshold | Description |
-|----------------|-----------|-------------|
-| Sleeper | ADP - ECR ≥ 15 | Being drafted later than experts suggest |
-| Bust Risk | ADP - ECR ≤ -15 | Being drafted earlier than warranted |
-| Fair Value | Within 15 picks | ADP and ECR aligned |
-
-**Magnitude**:
-- Significant: ≥ 30 picks difference
-- Moderate: 15-29 picks difference
+| Classification | Description |
+|----------------|-------------|
+| **Sleeper** | Being drafted later than experts suggest |
+| **Bust Risk** | Being drafted earlier than warranted |
+| **Fair Value** | ADP and ECR aligned |
 
 ### Category Analysis
 
@@ -442,80 +382,6 @@ Features:
 | `/api/v1/players/sync-injuries` | POST | Sync injuries from ESPN |
 
 See http://localhost:8000/docs for full interactive API documentation.
-
----
-
-## Configuration
-
-Key settings in `backend/app/config.py`:
-
-### Risk Score Weights
-
-```python
-risk_weight_rank_variance = 0.25      # Ranking disagreement
-risk_weight_injury = 0.25             # Injury concerns
-risk_weight_experience = 0.15         # MLB experience
-risk_weight_projection_variance = 0.15 # Projection disagreement
-risk_weight_age = 0.10                # Age-based decline
-risk_weight_adp_ecr = 0.10            # Market vs expert
-```
-
-### Risk Thresholds
-
-```python
-safe_risk_threshold = 30.0            # Below = safe pick
-risky_risk_threshold = 60.0           # Above = risky pick
-```
-
-### Injury Scoring
-
-```python
-injury_score_il60 = 80                # 60-day IL
-injury_score_il10 = 50                # 10-day IL
-injury_score_dtd = 30                 # Day-to-day
-injury_news_penalty = 5               # Per injury article
-injury_news_max_penalty = 20          # Cap on news penalty
-```
-
-### Experience Thresholds
-
-```python
-# Proven (2 full seasons)
-proven_career_pa = 1100               # Hitters
-proven_career_ip = 340                # Pitchers
-
-# Established (1 full season)
-established_career_pa = 550
-established_career_ip = 170
-```
-
-### Category Specialist Thresholds
-
-```python
-specialist_sb_threshold = 15          # Speed specialist
-specialist_hr_threshold = 25          # Power specialist
-specialist_avg_threshold = 0.280      # AVG specialist
-specialist_k_threshold = 150          # K specialist
-specialist_sv_threshold = 20          # Saves specialist
-```
-
-### Roster Configuration
-
-```python
-roster_slots = {
-    "C": 1, "1B": 1, "2B": 1, "3B": 1, "SS": 1,
-    "OF": 3, "UTIL": 1, "SP": 5, "RP": 2, "BE": 4, "IL": 1
-}
-```
-
-### Refresh Intervals
-
-```python
-projections_refresh_interval = 1440   # Daily (minutes)
-rankings_refresh_interval = 60        # Hourly
-news_refresh_interval = 15            # Every 15 minutes
-draft_poll_interval = 5               # Every 5 seconds
-```
 
 ---
 
