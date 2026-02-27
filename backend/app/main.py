@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -36,7 +37,39 @@ async def lifespan(app: FastAPI):
             await sync_svc.recalculate_metrics(db)
             logger.info("Initial seed complete.")
 
+    # --- Scheduled background refresh jobs ---
+    data_sync = app.state.data_sync_service
+
+    async def _scheduled_news():
+        async with async_session() as db:
+            await data_sync.refresh_news(db)
+
+    async def _scheduled_rankings():
+        async with async_session() as db:
+            await data_sync.refresh_rankings(db)
+
+    async def _scheduled_projections():
+        async with async_session() as db:
+            await data_sync.refresh_projections(db)
+            await data_sync.fetch_espn_projections(db, year=settings.default_year)
+            await data_sync.fetch_fantasypros_projections(db)
+            await data_sync.fetch_razzball_projections(db)
+
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(_scheduled_news,        'interval', minutes=settings.news_refresh_interval)
+    scheduler.add_job(_scheduled_rankings,    'interval', minutes=settings.rankings_refresh_interval)
+    scheduler.add_job(_scheduled_projections, 'interval', minutes=settings.projections_refresh_interval)
+    scheduler.start()
+    logger.info(
+        "Scheduler started — news every %d min, rankings every %d min, projections every %d min",
+        settings.news_refresh_interval,
+        settings.rankings_refresh_interval,
+        settings.projections_refresh_interval,
+    )
+
     yield
+
+    scheduler.shutdown(wait=False)
     # Shutdown - cleanup HTTP clients
     if hasattr(app.state, "data_sync_service") and app.state.data_sync_service is not None:
         await app.state.data_sync_service.close()

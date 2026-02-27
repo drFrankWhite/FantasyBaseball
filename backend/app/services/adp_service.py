@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import Player, PlayerRanking, RankingSource
+from app.models import Player, PlayerRanking, RankingSource, League
 from app.utils import normalize_name, build_player_name_lookup
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,17 @@ async def sync_espn_adp(db: AsyncSession) -> Dict[str, Any]:
     Sync ADP data from ESPN.
     Returns stats about the sync.
     """
-    url = f"https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/{settings.default_year}/segments/0/leagues/{settings.default_league_id}"
+    # Load ESPN credentials and league ID from the database
+    league_result = await db.execute(
+        select(League).where(League.espn_league_id != 0).limit(1)
+    )
+    espn_league = league_result.scalar_one_or_none()
+    if not espn_league or not espn_league.espn_s2 or not espn_league.swid:
+        raise ValueError(
+            "ESPN credentials not configured. Enter them via the Setup Wizard or Settings modal."
+        )
+
+    url = f"https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/{settings.default_year}/segments/0/leagues/{espn_league.espn_league_id}"
 
     headers = {
         "User-Agent": "Mozilla/5.0",
@@ -35,11 +45,10 @@ async def sync_espn_adp(db: AsyncSession) -> Dict[str, Any]:
         "x-fantasy-filter": '{"players":{"limit":500,"sortPercOwned":{"sortPriority":1,"sortAsc":false}}}',
     }
 
-    cookies = {}
-    if settings.espn_s2:
-        cookies["espn_s2"] = settings.espn_s2
-    if settings.swid:
-        cookies["SWID"] = settings.swid
+    cookies = {
+        "espn_s2": espn_league.espn_s2,
+        "SWID": espn_league.swid,
+    }
 
     try:
         async with httpx.AsyncClient() as client:

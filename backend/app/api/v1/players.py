@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import Player, PlayerRanking, PlayerProjection, PlayerNews, DraftSession, PositionTier, Team
+from app.models import Player, PlayerRanking, PlayerProjection, PlayerNews, DraftSession, PositionTier, Team, League
 from app.schemas.player import PlayerResponse, PlayerDetailResponse, PickPredictionResponse
 from app.utils import (
     normalize_name,
@@ -917,12 +917,16 @@ async def refresh_all_data(
 
     # 2. Sync injuries from ESPN
     try:
-        if settings.espn_s2 and settings.swid:
+        league_result = await db.execute(
+            select(League).where(League.espn_league_id != 0).limit(1)
+        )
+        espn_league = league_result.scalar_one_or_none()
+        if espn_league and espn_league.espn_s2 and espn_league.swid:
             espn = ESPNService(
-                league_id=settings.default_league_id,
-                year=settings.default_year,
-                espn_s2=settings.espn_s2,
-                swid=settings.swid,
+                league_id=espn_league.espn_league_id,
+                year=espn_league.year,
+                espn_s2=espn_league.espn_s2,
+                swid=espn_league.swid,
             )
             injured_players = await espn.fetch_player_injuries()
 
@@ -940,6 +944,8 @@ async def refresh_all_data(
 
             await db.commit()
             results["injuries"] = {"updated": updated, "total_injured": len(injured_players)}
+        else:
+            results["injuries"] = {"skipped": "No ESPN credentials found in database"}
     except Exception as e:
         results["injuries"] = {"error": str(e)}
 
@@ -1015,20 +1021,23 @@ async def sync_injuries_from_espn(
     from app.services.espn_service import ESPNService
     from app.config import settings
 
-    # Check if ESPN credentials are configured
-    if not settings.espn_s2 or not settings.swid:
+    # Load ESPN credentials from the database league record
+    league_result = await db.execute(
+        select(League).where(League.espn_league_id != 0).limit(1)
+    )
+    espn_league = league_result.scalar_one_or_none()
+    if not espn_league or not espn_league.espn_s2 or not espn_league.swid:
         raise HTTPException(
             status_code=400,
-            detail="ESPN credentials not configured. Set ESPN_S2 and SWID environment variables."
+            detail="ESPN credentials not configured. Enter them via the Setup Wizard or Settings modal."
         )
 
     try:
-        # Use the configured ESPN league ID
         espn = ESPNService(
-            league_id=settings.default_league_id,
-            year=settings.default_year,
-            espn_s2=settings.espn_s2,
-            swid=settings.swid,
+            league_id=espn_league.espn_league_id,
+            year=espn_league.year,
+            espn_s2=espn_league.espn_s2,
+            swid=espn_league.swid,
         )
 
         # Fetch injured players from ESPN
