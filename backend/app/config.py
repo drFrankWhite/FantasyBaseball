@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     swid: Optional[str] = None
 
     # Default league settings
-    default_league_id: int = 4327
+    default_league_id: int = 0
     default_year: int = 2026
 
     # H2H Categories (configure for your league)

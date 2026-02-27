@@ -122,7 +122,7 @@ Navigate to **[http://localhost:8000](http://localhost:8000)**
 
 Click the **"Refresh Data"** button in the app. This fetches the latest rankings, projections, and player data from all sources. It may take 30–60 seconds on first run.
 
-> The app will automatically set up your league (ESPN ID: 4327) on first launch.
+> The app will automatically set up your league on first launch using the `DEFAULT_LEAGUE_ID` from your `.env` file.
 
 ---
 
@@ -580,7 +580,7 @@ ruff format .
 
 ## League Configuration
 
-Default league settings (MassHoles):
+Default league settings:
 - **Format**: 12-team H2H Categories
 - **Scoring Categories**:
   - Batting: R, HR, RBI, SB, AVG, OPS
