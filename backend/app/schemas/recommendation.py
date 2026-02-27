@@ -208,3 +208,5 @@ class CategoryPlannerResponse(BaseModel):
     focus_categories: List[str]
     focus_plan: List[CategoryPlannerFocusResponse]
     summary: str
+    rate_stats_reliable: bool = True
+    team_position_counts: Dict[str, int] = Field(default_factory=dict)
