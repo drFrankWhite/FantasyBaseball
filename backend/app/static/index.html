@@ -71,6 +71,8 @@
             <div id="xp-bar-fill" class="xp-bar-fill" style="width: 0%"></div>
             <span id="xp-text" class="xp-text">PICK 1 OF 240</span>
         </div>
+        <!-- Pick Timeline -->
+        <div id="pick-timeline" class="pick-timeline mt-1"></div>
     </div>
 
     <!-- Header -->
@@ -78,7 +80,13 @@
         <div class="flex items-center justify-between">
             <!-- Zone 1: Identity -->
             <div class="flex items-center gap-3">
-                <span class="text-2xl select-none" aria-hidden="true">⚾</span>
+                <svg class="w-6 h-6 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M14.5 8.5c.92.9 1.5 2.13 1.5 3.5s-.58 2.6-1.5 3.5"/>
+                    <path d="M9.5 8.5C8.58 9.4 8 10.63 8 12s.58 2.6 1.5 3.5"/>
+                    <path d="M16.5 6.5A8.97 8.97 0 0 1 21 12a8.97 8.97 0 0 1-4.5 5.5"/>
+                    <path d="M7.5 17.5A8.97 8.97 0 0 1 3 12a8.97 8.97 0 0 1 4.5-5.5"/>
+                </svg>
                 <h1 class="text-lg font-bold">Draft Assistant</h1>
                 <span id="league-name-badge" class="league-badge-pill hidden">
                     <span id="league-name">--</span>
@@ -108,13 +116,20 @@
                     Draft Mode
                 </button>
                 <!-- Mock Draft -->
-                <button id="mock-draft-btn" onclick="showMockDraftSetup()" title="Start a mock draft practice session">
-                    ✦ Mock Draft
+                <button id="mock-draft-btn" onclick="showMockDraftSetup()" title="Start a mock draft practice session" class="flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/>
+                        <path d="M18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/>
+                    </svg>
+                    Mock Draft
                 </button>
                 <!-- Sync Dropdown -->
                 <div class="relative">
-                    <button id="sync-btn" onclick="toggleSyncDropdown()" class="header-outline-btn" title="Sync data options">
-                        ⟳ Sync
+                    <button id="sync-btn" onclick="toggleSyncDropdown()" class="header-outline-btn flex items-center gap-1.5" title="Sync data options">
+                        <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                        </svg>
+                        Sync
                     </button>
                     <div id="sync-dropdown" class="sync-dropdown hidden">
                         <button onclick="refreshData(); toggleSyncDropdown()" class="sync-dropdown-item">Quick Refresh</button>
@@ -297,14 +312,14 @@
                 <button onclick="showTab('my-team')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="my-team" role="tab" aria-selected="false" aria-controls="tab-my-team">
                     My Team
                 </button>
-                <button onclick="showTab('draft-history')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="draft-history" role="tab" aria-selected="false" aria-controls="tab-draft-history">
-                    History
+                <button onclick="showTab('market')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="market" role="tab" aria-selected="false" aria-controls="tab-market">
+                    Market
                 </button>
-                <button onclick="showTab('teams')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="teams" role="tab" aria-selected="false" aria-controls="tab-teams">
-                    Teams
+                <button onclick="showTab('prospects')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="prospects" role="tab" aria-selected="false" aria-controls="tab-prospects">
+                    Prospects
                 </button>
                 <button onclick="showTab('keepers')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="keepers" role="tab" aria-selected="false" aria-controls="tab-keepers">
-                    Keepers
+                    League
                 </button>
             </div>
 
@@ -331,36 +346,6 @@
                         </div>
                     </div>
 
-                    <!-- Prospects (collapsible, keeper-focused) -->
-                    <div class="mb-2 collapsible-section" data-section="prospects">
-                        <button onclick="toggleSection('prospects')" class="w-full flex items-center justify-between text-left py-2 hover:bg-gray-800/50 rounded px-2 -mx-2" aria-expanded="true" aria-controls="prospect-picks">
-                            <div>
-                                <h3 class="text-sm font-semibold text-purple-400">Prospects</h3>
-                                <p class="text-xs text-gray-500">Keeper league value</p>
-                            </div>
-                            <svg class="section-chevron w-4 h-4 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </button>
-                        <div id="prospect-picks" class="section-content space-y-2 mt-2">
-                            <!-- Populated by renderRecommendations() -->
-                        </div>
-                    </div>
-
-                    <!-- Market Context: collapsible drawer for Scarcity + Planner -->
-                    <div class="market-context-section mt-3">
-                        <button onclick="toggleMarketContext()" id="market-context-btn" class="market-context-toggle" aria-expanded="false" aria-controls="market-context-body">
-                            <span class="text-xs font-semibold text-gray-400 tracking-wider uppercase">Market Context</span>
-                            <svg class="market-context-chevron w-4 h-4 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </button>
-                        <div id="market-context-body" class="market-context-body collapsed">
-                            <div id="scarcity-dashboard" class="mb-4 mt-3"></div>
-                            <div id="planner-dashboard" class="mt-2 pb-3"></div>
-                        </div>
-                    </div>
-
                 </div>
 
                 <!-- My Team Tab -->
@@ -371,64 +356,18 @@
                     </div>
                 </div>
 
-                <!-- Draft History Tab -->
-                <div id="tab-draft-history" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-draft-history">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold">Draft History</h3>
-                        <span id="history-pick-count" class="text-sm text-gray-500">0 picks</span>
-                    </div>
-                    <div id="draft-history-list" class="space-y-2">
-                        <!-- Draft history loaded dynamically -->
-                    </div>
+                <!-- Market Tab -->
+                <div id="tab-market" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-market">
+                    <h3 class="text-lg font-semibold mb-4">Market Context</h3>
+                    <div id="scarcity-dashboard" class="mb-4"></div>
+                    <div id="planner-dashboard" class="mt-2"></div>
                 </div>
 
-                <!-- Teams Tab -->
-                <div id="tab-teams" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-teams">
-                    <!-- Draft Order Setup Section -->
-                    <div class="mb-6">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-lg font-semibold text-amber-400">Draft Order</h3>
-                        </div>
-                        <div class="mb-3">
-                            <label class="text-xs text-gray-500 block mb-1">Number of Teams</label>
-                            <select id="teams-num-teams" onchange="updateTeamsTabNameFields()"
-                                class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500 focus:outline-none">
-                                <option value="8">8 Teams</option>
-                                <option value="10">10 Teams</option>
-                                <option value="12" selected>12 Teams</option>
-                                <option value="14">14 Teams</option>
-                                <option value="16">16 Teams</option>
-                            </select>
-                        </div>
-                        <div id="teams-names-container" class="space-y-2 max-h-64 overflow-y-auto mb-3">
-                            <!-- Team name inputs injected by updateTeamsTabNameFields() -->
-                        </div>
-                        <button onclick="saveTeamsTabConfig()" class="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold text-sm border border-gray-600 transition-all">
-                            💾 Save Draft Order
-                        </button>
-                    </div>
-
-                    <!-- Team Rosters Section (during draft) -->
-                    <div class="border-t border-gray-700 pt-4">
-                        <h3 class="text-lg font-semibold text-cyan-300 mb-3">Team Claim</h3>
-                        <div class="bg-gray-900/60 border border-gray-700 rounded-lg p-3 mb-4">
-                            <p id="claim-status" class="text-xs text-gray-400 mb-2">No team claimed yet.</p>
-                            <div class="flex gap-2 mb-2">
-                                <select id="claim-team-select" class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm">
-                                    <option value="">-- Select a team to claim --</option>
-                                </select>
-                                <button onclick="claimSelectedTeam()" class="px-3 py-2 bg-cyan-700 hover:bg-cyan-600 rounded text-sm">Claim</button>
-                            </div>
-                            <button onclick="releaseMyTeamClaim()" class="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs">Release My Claim</button>
-                        </div>
-
-                        <h3 class="text-lg font-semibold text-gray-300 mb-3">Team Rosters</h3>
-                        <div class="mb-4">
-                            <select id="team-selector" onchange="loadSelectedTeamRoster()" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm">
-                                <option value="">-- Select a team --</option>
-                            </select>
-                        </div>
-                        <div id="selected-team-roster" class="space-y-2"></div>
+                <!-- Prospects Tab -->
+                <div id="tab-prospects" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-prospects">
+                    <h3 class="text-lg font-semibold mb-4 text-purple-400">Prospects</h3>
+                    <div id="prospect-picks" class="space-y-2">
+                        <!-- Populated by renderProspects() -->
                     </div>
                 </div>
 
@@ -436,7 +375,7 @@
                 <div id="tab-keepers" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-keepers">
                     <div class="keeper-section">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-lg font-semibold text-amber-400">Keepers</h3>
+                            <h3 class="text-lg font-semibold text-amber-400">League</h3>
                             <span id="keeper-count" class="text-xs text-gray-500">0 keepers</span>
                         </div>
                         <!-- Add Keeper Form -->
@@ -445,7 +384,7 @@
                                 <div>
                                     <label class="text-xs text-gray-500 block mb-1">Team Name</label>
                                     <select id="keeper-team-select"
-                                        class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500 focus:outline-none">
+                                        class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500">
                                         <option value="">Select a team...</option>
                                     </select>
                                 </div>
@@ -455,7 +394,7 @@
                                         placeholder="Search for player..."
                                         oninput="searchKeeperPlayer(this.value)"
                                         autocomplete="off"
-                                        class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500 focus:outline-none">
+                                        class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500">
                                     <div id="keeper-autocomplete" class="keeper-autocomplete hidden"></div>
                                     <input type="hidden" id="keeper-player-id">
                                 </div>
@@ -463,7 +402,7 @@
                                     <div class="flex-1">
                                         <label class="text-xs text-gray-500 block mb-1">Round</label>
                                         <select id="keeper-round-select"
-                                            class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500 focus:outline-none">
+                                            class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500">
                                         </select>
                                     </div>
                                     <div class="flex items-end">
@@ -479,6 +418,67 @@
                             <div class="text-center py-4">
                                 <p class="text-gray-500 text-sm">No keepers added yet</p>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Draft Order Section -->
+                    <div class="border-t border-gray-700 pt-4 mt-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-amber-400">Draft Order</h3>
+                        </div>
+                        <div class="mb-3">
+                            <label class="text-xs text-gray-500 block mb-1">Number of Teams</label>
+                            <select id="teams-num-teams" onchange="updateTeamsTabNameFields()"
+                                class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-sm focus:border-amber-500">
+                                <option value="8">8 Teams</option>
+                                <option value="10">10 Teams</option>
+                                <option value="12" selected>12 Teams</option>
+                                <option value="14">14 Teams</option>
+                                <option value="16">16 Teams</option>
+                            </select>
+                        </div>
+                        <div id="teams-names-container" class="space-y-2 max-h-64 overflow-y-auto mb-3">
+                            <!-- Team name inputs injected by updateTeamsTabNameFields() -->
+                        </div>
+                        <button onclick="saveTeamsTabConfig()" class="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold text-sm border border-gray-600 transition-all">
+                            💾 Save Draft Order
+                        </button>
+                    </div>
+
+                    <!-- Team Claim Section -->
+                    <div class="border-t border-gray-700 pt-4 mt-4">
+                        <h3 class="text-lg font-semibold text-cyan-300 mb-3">Team Claim</h3>
+                        <div class="bg-gray-900/60 border border-gray-700 rounded-lg p-3 mb-4">
+                            <p id="claim-status" class="text-xs text-gray-400 mb-2">No team claimed yet.</p>
+                            <div class="flex gap-2 mb-2">
+                                <select id="claim-team-select" class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm">
+                                    <option value="">-- Select a team to claim --</option>
+                                </select>
+                                <button onclick="claimSelectedTeam()" class="px-3 py-2 bg-cyan-700 hover:bg-cyan-600 rounded text-sm">Claim</button>
+                            </div>
+                            <button onclick="releaseMyTeamClaim()" class="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs">Release My Claim</button>
+                        </div>
+                    </div>
+
+                    <!-- Team Rosters Section -->
+                    <div class="border-t border-gray-700 pt-4 mt-4">
+                        <h3 class="text-lg font-semibold text-gray-300 mb-3">Team Rosters</h3>
+                        <div class="mb-4">
+                            <select id="team-selector" onchange="loadSelectedTeamRoster()" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm">
+                                <option value="">-- Select a team --</option>
+                            </select>
+                        </div>
+                        <div id="selected-team-roster" class="space-y-2"></div>
+                    </div>
+
+                    <!-- Draft History Section -->
+                    <div class="border-t border-gray-700 pt-4 mt-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold">Draft History</h3>
+                            <span id="history-pick-count" class="text-sm text-gray-500">0 picks</span>
+                        </div>
+                        <div id="draft-history-list" class="space-y-2">
+                            <!-- Draft history loaded dynamically -->
                         </div>
                     </div>
                 </div>
@@ -639,7 +639,7 @@
                         <div id="modal-notes-display" class="text-sm text-gray-300 whitespace-pre-wrap"></div>
                         <!-- Edit mode -->
                         <div id="modal-notes-edit" class="hidden">
-                            <textarea id="modal-notes-textarea" class="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm text-gray-200 resize-y focus:border-blue-500 focus:outline-none" style="min-height: 80px" placeholder="Add scouting notes, analysis, or reminders..."></textarea>
+                            <textarea id="modal-notes-textarea" class="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-sm text-gray-200 resize-y focus:border-blue-500" style="min-height: 80px" placeholder="Add scouting notes, analysis, or reminders..."></textarea>
                             <div class="flex justify-end gap-2 mt-2">
                                 <button onclick="cancelNotesEdit()" class="px-3 py-1 text-xs rounded border border-gray-600 hover:bg-gray-700 transition-colors">Cancel</button>
                                 <button onclick="savePlayerNotes()" class="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 font-medium transition-colors">Save</button>
@@ -854,13 +854,13 @@
             <div class="p-6 space-y-4">
                 <div>
                     <label class="text-sm text-gray-300 block mb-2">Session Name:</label>
-                    <input id="draft-session-name" type="text" placeholder="e.g., March 15 Draft, Mock Draft #3" class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-lg focus:border-amber-500 focus:outline-none">
+                    <input id="draft-session-name" type="text" placeholder="e.g., March 15 Draft, Mock Draft #3" class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-lg focus:border-amber-500">
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="text-sm text-gray-300 block mb-2">Number of Teams:</label>
-                        <select id="draft-num-teams" class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:border-amber-500 focus:outline-none">
+                        <select id="draft-num-teams" class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:border-amber-500">
                             <option value="8">8 Teams</option>
                             <option value="10">10 Teams</option>
                             <option value="12" selected>12 Teams</option>
@@ -870,7 +870,7 @@
                     </div>
                     <div>
                         <label class="text-sm text-gray-300 block mb-2">Your Draft Position:</label>
-                        <select id="draft-user-position" class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:border-amber-500 focus:outline-none">
+                        <select id="draft-user-position" class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:border-amber-500">
                             <!-- Options populated by JS based on num_teams -->
                         </select>
                     </div>
@@ -1009,13 +1009,13 @@
                 <div>
                     <label for="wizard-league-name" class="block text-sm font-medium text-gray-300 mb-1">League Name</label>
                     <input id="wizard-league-name" type="text" placeholder="My Fantasy League"
-                        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
+                        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:border-blue-500" />
                 </div>
                 <!-- ESPN League ID -->
                 <div>
                     <label for="wizard-espn-league-id" class="block text-sm font-medium text-gray-300 mb-1">ESPN League ID</label>
                     <input id="wizard-espn-league-id" type="number" placeholder="e.g. 123456"
-                        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
+                        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 focus:border-blue-500" />
                     <p class="text-gray-500 text-xs mt-1">Find it in your ESPN league URL: <span class="text-gray-400 font-mono">fantasy.espn.com/baseball/league?leagueId=<span class="text-blue-400">XXXXXX</span></span></p>
                 </div>
                 <!-- ESPN Credentials (optional) -->
@@ -1024,12 +1024,12 @@
                     <div>
                         <label for="wizard-espn-s2" class="block text-xs text-gray-400 mb-1">ESPN S2 Cookie</label>
                         <input id="wizard-espn-s2" type="password" placeholder="espn_s2 value"
-                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500" />
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 text-sm focus:border-blue-500" />
                     </div>
                     <div>
                         <label for="wizard-swid" class="block text-xs text-gray-400 mb-1">SWID Cookie</label>
                         <input id="wizard-swid" type="password" placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"
-                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500" />
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-500 text-sm focus:border-blue-500" />
                     </div>
                 </div>
                 <!-- Error message -->
@@ -1078,13 +1078,13 @@
                 <div>
                     <label class="text-sm text-gray-300 block mb-2">espn_s2 Cookie:</label>
                     <textarea id="settings-espn-s2" rows="3" placeholder="Paste your espn_s2 cookie value here..."
-                        class="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm font-mono focus:border-emerald-500 focus:outline-none resize-none"></textarea>
+                        class="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm font-mono focus:border-emerald-500 resize-none"></textarea>
                 </div>
 
                 <div>
                     <label class="text-sm text-gray-300 block mb-2">SWID Cookie:</label>
                     <input id="settings-swid" type="text" placeholder="Paste your SWID cookie value here (e.g. {GUID})"
-                        class="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm font-mono focus:border-emerald-500 focus:outline-none">
+                        class="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm font-mono focus:border-emerald-500">
                 </div>
 
                 <div class="bg-gray-900/50 border border-gray-700 rounded-lg p-4">

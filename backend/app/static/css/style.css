@@ -1,53 +1,53 @@
-/* Fantasy Baseball Draft Assistant - VIDEO GAME THEME */
-/* Arcade/RPG style with power bars, achievements, and neon effects */
+/* Fantasy Baseball Draft Assistant - SCOUT REPORT THEME */
+/* Professional scouting binder aesthetic — charcoal, cream, yellow-gold */
 
 /* ========================================
    CSS Variables / Design Tokens
    ======================================== */
 :root {
   /* Backgrounds */
-  --bg-primary:      #0a1a10;
-  --bg-secondary:    #0f2418;
-  --bg-card:         rgba(15, 36, 24, 0.95);
-  --bg-hover:        rgba(0, 230, 118, 0.08);
+  --bg-primary:      #111214;
+  --bg-secondary:    #16181c;
+  --bg-card:         rgba(22, 24, 28, 0.95);
+  --bg-hover:        rgba(245, 200, 66, 0.07);
 
   /* Text */
-  --text-primary:    #f5f5f0;   /* Stadium white */
-  --text-secondary:  #8fbc8f;   /* Muted sage */
-  --text-muted:      #4a6741;
+  --text-primary:    #e8e0d0;   /* Cream paper */
+  --text-secondary:  #a09a90;   /* Muted warm grey */
+  --text-muted:      #5a5550;
 
   /* Accents */
-  --neon-cyan:       #00e676;   /* Electric grass green — primary interactive */
-  --neon-magenta:    #ff8f00;   /* Warning-track clay — secondary accent */
-  --neon-yellow:     #ffeb3b;   /* Scoreboard yellow */
-  --neon-green:      #69f0ae;   /* Light mint — safe picks */
-  --neon-orange:     #ff6d00;   /* Clay orange — risky picks */
-  --neon-amber:      #ffd600;   /* Gold — recommended/legendary */
-  --neon-red:        #ff1744;   /* Danger red */
-  --neon-purple:     #e040fb;   /* Keep purple for prospects */
-  --neon-blue:       #40c4ff;   /* Clear sky — needs/info */
+  --neon-cyan:       #f5c842;   /* Scouting yellow — primary interactive */
+  --neon-magenta:    #e8e0d0;   /* Cream — secondary accent */
+  --neon-yellow:     #f5c842;   /* Same as primary */
+  --neon-green:      #81c784;   /* Soft turf green — safe picks */
+  --neon-orange:     #e57373;   /* Soft red — risky picks */
+  --neon-amber:      #f5c842;   /* Scouting yellow — recommended/legendary */
+  --neon-red:        #ef5350;   /* Danger red */
+  --neon-purple:     #ba68c8;   /* Soft purple — prospects */
+  --neon-blue:       #64b5f6;   /* Soft blue — needs/info */
 
-  /* Rarity (Gacha system — keep intact) */
-  --rarity-common:    #8888aa;
-  --rarity-uncommon:  #44cc88;
-  --rarity-rare:      #4488ff;
-  --rarity-epic:      #aa44ff;
-  --rarity-legendary: #ffd600;  /* Updated to match new amber */
+  /* Rarity (Gacha system — semantic colors preserved) */
+  --rarity-common:    #757570;
+  --rarity-uncommon:  #81c784;
+  --rarity-rare:      #64b5f6;
+  --rarity-epic:      #ba68c8;
+  --rarity-legendary: #f5c842;
 
-  /* Glows (updated to match new accent colors) */
-  --glow-cyan:    0 0 20px rgba(0, 230, 118, 0.6), 0 0 40px rgba(0, 230, 118, 0.3);
-  --glow-magenta: 0 0 20px rgba(255, 143, 0, 0.6), 0 0 40px rgba(255, 143, 0, 0.3);
-  --glow-gold:    0 0 20px rgba(255, 214, 0, 0.6), 0 0 40px rgba(255, 214, 0, 0.3);
-  --glow-green:   0 0 20px rgba(105, 240, 174, 0.6), 0 0 40px rgba(105, 240, 174, 0.3);
-  --glow-red:     0 0 20px rgba(255, 23, 68, 0.6),  0 0 40px rgba(255, 23, 68, 0.3);
+  /* Glows — toned down for professional feel */
+  --glow-cyan:    0 0 12px rgba(245, 200, 66, 0.4), 0 0 24px rgba(245, 200, 66, 0.15);
+  --glow-magenta: 0 0 12px rgba(232, 224, 208, 0.3), 0 0 24px rgba(232, 224, 208, 0.1);
+  --glow-gold:    0 0 12px rgba(245, 200, 66, 0.4), 0 0 24px rgba(245, 200, 66, 0.15);
+  --glow-green:   0 0 12px rgba(129, 199, 132, 0.4), 0 0 24px rgba(129, 199, 132, 0.15);
+  --glow-red:     0 0 12px rgba(239, 83, 80, 0.4),  0 0 24px rgba(239, 83, 80, 0.15);
 
   /* Gradients */
-  --gradient-neon:   linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-magenta) 100%);
-  --gradient-gold:   linear-gradient(135deg, #ffd600 0%, #ff8f00 100%);
-  --gradient-power:  linear-gradient(90deg, #ff1744 0%, #ffd600 50%, #69f0ae 100%);
-  --gradient-header: linear-gradient(135deg, #0a1a10 0%, #0f2418 50%, #0a1a10 100%);
-  --gradient-button: linear-gradient(135deg, #00e676 0%, #69f0ae 100%);
-  --gradient-xp:     linear-gradient(90deg, #00e676 0%, #40c4ff 100%);
+  --gradient-neon:   linear-gradient(135deg, #f5c842 0%, #e8e0d0 100%);
+  --gradient-gold:   linear-gradient(135deg, #f5c842 0%, #e57373 100%);
+  --gradient-power:  linear-gradient(90deg, #ef5350 0%, #f5c842 50%, #81c784 100%);
+  --gradient-header: linear-gradient(135deg, #111214 0%, #16181c 50%, #111214 100%);
+  --gradient-button: linear-gradient(135deg, #f5c842 0%, #e8c842 100%);
+  --gradient-xp:     linear-gradient(90deg, #81c784 0%, #f5c842 100%);
 
   /* Pixel / spacing tokens — unchanged */
   --radius-sm: 4px;
@@ -63,7 +63,7 @@
 /* ========================================
    Font Import - Gaming Style
    ======================================== */
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&family=Chakra+Petch:wght@400;500;600&display=swap');
 
 /* ========================================
    Base Styles
@@ -71,39 +71,20 @@
 body {
     background: var(--bg-primary);
     background-image:
-        repeating-linear-gradient(0deg, transparent, transparent 50px, rgba(0, 230, 118, 0.025) 50px, rgba(0, 230, 118, 0.025) 51px),
-        repeating-linear-gradient(90deg, transparent, transparent 50px, rgba(0, 230, 118, 0.015) 50px, rgba(0, 230, 118, 0.015) 51px);
+        repeating-linear-gradient(0deg, transparent, transparent 50px, rgba(245, 200, 66, 0.018) 50px, rgba(245, 200, 66, 0.018) 51px),
+        repeating-linear-gradient(90deg, transparent, transparent 50px, rgba(245, 200, 66, 0.010) 50px, rgba(245, 200, 66, 0.010) 51px);
     background-attachment: fixed;
     font-family: 'Rajdhani', 'Segoe UI', sans-serif;
-}
-
-/* Scanline overlay effect */
-body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0.1) 0px,
-        rgba(0, 0, 0, 0.1) 1px,
-        transparent 1px,
-        transparent 3px
-    );
-    pointer-events: none;
-    z-index: 9999;
-    opacity: 0.06;   /* Barely perceptible — keeps atmosphere, stops interfering with table */
 }
 
 /* ========================================
    Header - Command Bar Style
    ======================================== */
 header {
-    background: linear-gradient(180deg, rgba(18, 18, 31, 0.98) 0%, rgba(10, 10, 18, 0.98) 100%);
+    background: var(--bg-secondary) !important;
     border-bottom: 2px solid var(--neon-cyan);
-    box-shadow: 0 4px 30px rgba(0, 240, 255, 0.2);
+    border-bottom-color: rgba(245, 200, 66, 0.25) !important;
+    box-shadow: 0 4px 30px rgba(245, 200, 66, 0.15);
     position: relative;
 }
 
@@ -137,7 +118,7 @@ header h1 {
     -webkit-text-fill-color: transparent;
     background-clip: text;
     text-shadow: none;
-    filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.5));
+    filter: drop-shadow(0 0 10px rgba(245, 200, 66, 0.5));
 }
 
 /* ========================================
@@ -182,17 +163,19 @@ button:not(:disabled):active {
     background: var(--gradient-neon);
     border: none;
     box-shadow: var(--glow-cyan);
+    cursor: pointer;
 }
 
 /* Header buttons */
 header button {
     border: 2px solid var(--neon-cyan);
-    background: rgba(0, 240, 255, 0.1);
+    background: rgba(245, 200, 66, 0.1);
     color: var(--neon-cyan);
+    cursor: pointer;
 }
 
 header button:hover {
-    background: rgba(0, 240, 255, 0.3);
+    background: rgba(245, 200, 66, 0.3);
     border-color: var(--neon-magenta);
     color: #fff;
 }
@@ -210,7 +193,7 @@ header button.bg-purple-600 {
 }
 
 header button.bg-emerald-600 {
-    background: linear-gradient(135deg, rgba(0, 255, 136, 0.3) 0%, rgba(0, 255, 136, 0.1) 100%);
+    background: linear-gradient(135deg, rgba(245, 200, 66, 0.3) 0%, rgba(245, 200, 66, 0.1) 100%);
     border-color: var(--neon-green);
     color: var(--neon-green);
 }
@@ -279,7 +262,7 @@ header button.bg-emerald-600 {
    Tab Navigation - Menu Style
    ======================================== */
 .tab-btn {
-    font-family: 'Orbitron', sans-serif;
+    font-family: 'Chakra Petch', 'Orbitron', sans-serif;
     font-size: 0.75rem;
     color: var(--text-secondary);
     border: none;
@@ -288,6 +271,7 @@ header button.bg-emerald-600 {
     position: relative;
     text-transform: uppercase;
     letter-spacing: 1px;
+    cursor: pointer;
 }
 
 .tab-btn::after {
@@ -300,9 +284,9 @@ header button.bg-emerald-600 {
 }
 
 .tab-btn.active {
-    color: var(--neon-cyan);
-    border-bottom-color: var(--neon-cyan);
-    text-shadow: 0 0 20px var(--neon-cyan);
+    color: var(--neon-amber);
+    border-bottom-color: var(--neon-amber);
+    text-shadow: 0 0 20px var(--neon-amber);
 }
 
 /* ========================================
@@ -313,20 +297,20 @@ header button.bg-emerald-600 {
     border-left: 4px solid transparent;
     position: relative;
     background: rgba(18, 18, 31, 0.6);
-    border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+    border-bottom: 1px solid rgba(245, 200, 66, 0.1);
     cursor: pointer;
 }
 
 .player-row:hover {
-    background: rgba(0, 240, 255, 0.1);
+    background: rgba(245, 200, 66, 0.1);
     border-left-color: var(--neon-cyan);
     transform: translateX(4px);
-    box-shadow: inset 0 0 30px rgba(0, 240, 255, 0.1);
+    box-shadow: inset 0 0 30px rgba(245, 200, 66, 0.1);
 }
 
 .player-row:active {
     transform: translateX(2px);
-    background: rgba(0, 240, 255, 0.15);
+    background: rgba(245, 200, 66, 0.15);
 }
 
 .player-row.drafted {
@@ -348,7 +332,7 @@ header button.bg-emerald-600 {
 }
 
 .player-row.highlight-safe {
-    background: linear-gradient(90deg, rgba(0, 255, 136, 0.15) 0%, transparent 100%);
+    background: linear-gradient(90deg, rgba(245, 200, 66, 0.15) 0%, transparent 100%);
     border-left-color: var(--neon-green);
 }
 
@@ -369,7 +353,7 @@ header button.bg-emerald-600 {
 
 /* Table header */
 thead {
-    background: linear-gradient(180deg, rgba(0, 230, 118, 0.1) 0%, transparent 100%), var(--bg-primary);
+    background: linear-gradient(180deg, rgba(245, 200, 66, 0.08) 0%, transparent 100%), var(--bg-primary);
     z-index: 10;
 }
 
@@ -388,6 +372,8 @@ thead th {
    ======================================== */
 .recommendation-card {
     background: var(--bg-card);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: 2px solid var(--neon-cyan);
     border-radius: var(--radius-lg);
     padding: 1rem;
@@ -502,7 +488,7 @@ thead th {
 
 .power-bar-fill.high {
     background: linear-gradient(90deg, var(--neon-green) 0%, var(--neon-cyan) 100%);
-    box-shadow: inset 0 0 10px rgba(0, 255, 136, 0.5);
+    box-shadow: inset 0 0 10px rgba(245, 200, 66, 0.5);
 }
 
 .power-bar-fill.medium {
@@ -523,17 +509,17 @@ thead th {
     align-items: center;
     padding: 0.25rem 0.6rem;
     border-radius: 9999px;
-    font-family: 'Orbitron', sans-serif;
+    font-family: 'Chakra Petch', 'Orbitron', sans-serif;
     font-size: 0.65rem;
     font-weight: 700;
     border: 2px solid;
 }
 
 .risk-badge.safe {
-    background: rgba(0, 255, 136, 0.2);
+    background: rgba(245, 200, 66, 0.2);
     color: var(--neon-green);
     border-color: var(--neon-green);
-    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+    box-shadow: 0 0 10px rgba(245, 200, 66, 0.3);
 }
 
 .risk-badge.moderate {
@@ -574,19 +560,19 @@ thead th {
 .category-item {
     padding: 0.75rem;
     background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(0, 240, 255, 0.2);
+    border: 1px solid rgba(245, 200, 66, 0.2);
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
 }
 
 .category-item:hover {
-    background: rgba(0, 240, 255, 0.1);
+    background: rgba(245, 200, 66, 0.1);
     border-color: var(--neon-cyan);
 }
 
 .category-short {
     padding: 0.125rem 0.375rem;
-    background: rgba(0, 240, 255, 0.2);
+    background: rgba(245, 200, 66, 0.2);
     border: 1px solid var(--neon-cyan);
     border-radius: var(--radius-sm);
     font-family: 'Orbitron', sans-serif;
@@ -617,7 +603,7 @@ thead th {
 
 .category-bar-fill.excellent {
     background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
-    box-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+    box-shadow: 0 0 15px rgba(245, 200, 66, 0.6);
 }
 
 .category-bar-fill.good {
@@ -648,7 +634,7 @@ thead th {
 }
 
 .category-icon.excellent {
-    background: rgba(0, 255, 136, 0.2);
+    background: rgba(245, 200, 66, 0.2);
     color: var(--neon-green);
     border-color: var(--neon-green);
 }
@@ -680,7 +666,7 @@ thead th {
     justify-content: center;
     padding: 0.2rem 0.6rem;
     border-radius: 9999px;
-    font-family: 'Orbitron', sans-serif;
+    font-family: 'Chakra Petch', 'Orbitron', sans-serif;
     font-size: 0.6rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -706,7 +692,7 @@ thead th {
 }
 
 .position-badge.outfield {
-    background: rgba(0, 255, 136, 0.2);
+    background: rgba(245, 200, 66, 0.2);
     color: var(--neon-green);
     border-color: var(--neon-green);
 }
@@ -745,11 +731,11 @@ thead th {
 }
 
 .pos-btn.active {
-    background: rgba(0, 240, 255, 0.15);
+    background: rgba(245, 200, 66, 0.15);
     border-color: var(--neon-cyan);
     color: var(--neon-cyan);
-    text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3), inset 0 0 8px rgba(0, 240, 255, 0.1);
+    text-shadow: 0 0 8px rgba(245, 200, 66, 0.5);
+    box-shadow: 0 0 10px rgba(245, 200, 66, 0.3), inset 0 0 8px rgba(245, 200, 66, 0.1);
 }
 
 /* ========================================
@@ -766,11 +752,36 @@ select {
 }
 
 input[type="text"]:focus,
-select:focus {
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+select:focus,
+textarea:focus {
     outline: none;
     border-color: var(--neon-magenta);
     box-shadow: var(--glow-magenta);
     background: rgba(255, 0, 255, 0.1);
+}
+
+/* Keyboard-accessible focus rings (focus-visible) */
+input[type="text"]:focus-visible,
+input[type="password"]:focus-visible,
+input[type="number"]:focus-visible,
+input[type="email"]:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
+
+button:focus {
+    outline: none;
+}
+
+button:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 3px;
+    box-shadow: var(--glow-cyan);
 }
 
 input[type="text"]::placeholder {
@@ -783,8 +794,11 @@ input[type="text"]::placeholder {
 #player-modal > div,
 #mock-draft-modal > div,
 #draft-session-modal > div,
-#session-history-modal > div {
+#session-history-modal > div,
+#compare-modal > div {
     background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 3px solid var(--neon-cyan);
     border-radius: var(--radius-xl);
     box-shadow: var(--glow-cyan), 0 20px 60px rgba(0, 0, 0, 0.8);
@@ -914,7 +928,7 @@ input[type="text"]::placeholder {
 }
 
 #undo-btn:not(:disabled):hover, #redo-btn:not(:disabled):hover {
-    background: rgba(0, 240, 255, 0.2);
+    background: rgba(245, 200, 66, 0.2);
     box-shadow: var(--glow-cyan);
 }
 
@@ -945,7 +959,7 @@ input[type="text"]::placeholder {
    Collapsible Sections
    ======================================== */
 .collapsible-section {
-    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+    border-bottom: 1px solid rgba(245, 200, 66, 0.2);
     padding-bottom: 1rem;
     margin-bottom: 0.5rem;
 }
@@ -965,7 +979,7 @@ input[type="text"]::placeholder {
 }
 
 .collapsible-section button:hover {
-    background: rgba(0, 240, 255, 0.1);
+    background: rgba(245, 200, 66, 0.1);
 }
 
 .section-content {
@@ -1052,7 +1066,7 @@ input[type="text"]::placeholder {
     color: var(--text-muted);
     text-transform: uppercase;
     padding-bottom: 0.375rem;
-    border-bottom: 1px solid rgba(0, 230, 118, 0.15);
+    border-bottom: 1px solid rgba(245, 200, 66, 0.15);
     margin-bottom: 0.5rem;
 }
 
@@ -1065,14 +1079,14 @@ input[type="text"]::placeholder {
     gap: 0.5rem;
     padding: 0.5rem 0.7rem;
     background: var(--bg-card);
-    border: 1px solid rgba(0, 230, 118, 0.12);
+    border: 1px solid rgba(245, 200, 66, 0.12);
     border-radius: var(--radius-md);
     transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .compact-pick-row:hover {
     background: var(--bg-hover);
-    border-color: rgba(0, 230, 118, 0.3);
+    border-color: rgba(245, 200, 66, 0.3);
 }
 
 .compact-pick-name {
@@ -1109,7 +1123,7 @@ input[type="text"]::placeholder {
    Decision Funnel — Pick Type Badges
    ======================================== */
 .pick-type-badge {
-    font-family: 'Orbitron', sans-serif;
+    font-family: 'Chakra Petch', 'Orbitron', sans-serif;
     font-size: 0.48rem;
     font-weight: 700;
     letter-spacing: 0.5px;
@@ -1126,9 +1140,9 @@ input[type="text"]::placeholder {
 }
 
 .pick-type-badge.pick-type-safe {
-    background: rgba(105, 240, 174, 0.1);
+    background: rgba(129, 199, 132, 0.1);
     color: var(--neon-green);
-    border: 1px solid rgba(105, 240, 174, 0.3);
+    border: 1px solid rgba(129, 199, 132, 0.3);
 }
 
 .pick-type-badge.pick-type-risky {
@@ -1144,17 +1158,76 @@ input[type="text"]::placeholder {
 }
 
 /* ========================================
+   Also Consider — Best Available By Position grid
+   ======================================== */
+.pos-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+}
+
+.pos-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 5px 3px 4px;
+    background: var(--bg-card);
+    border: 1px solid rgba(245, 200, 66, 0.12);
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+    min-width: 0;
+}
+
+.pos-chip:hover {
+    background: var(--bg-hover);
+    border-color: rgba(245, 200, 66, 0.3);
+}
+
+.pos-chip-empty {
+    opacity: 0.35;
+    cursor: default !important;
+}
+
+.pos-chip-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.48rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.pos-chip-name {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 0.62rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+}
+
+.pos-chip-rank {
+    font-size: 0.5rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-family: 'Chakra Petch', sans-serif;
+}
+
+/* ========================================
    Decision Funnel — Market Context Drawer
    ======================================== */
 .market-context-section {
-    border: 1px solid rgba(0, 230, 118, 0.12);
+    border: 1px solid rgba(245, 200, 66, 0.12);
     border-radius: var(--radius-md);
     overflow: hidden;
 }
 
 .market-context-toggle {
     width: 100%;
-    background: rgba(0, 230, 118, 0.03);
+    background: rgba(245, 200, 66, 0.03);
     border: none;
     padding: 0.6rem 0.875rem;
     cursor: pointer;
@@ -1165,12 +1238,12 @@ input[type="text"]::placeholder {
 }
 
 .market-context-toggle:hover {
-    background: rgba(0, 230, 118, 0.07);
+    background: rgba(245, 200, 66, 0.07);
 }
 
 .market-context-body {
     padding: 0 0.875rem;
-    border-top: 1px solid rgba(0, 230, 118, 0.1);
+    border-top: 1px solid rgba(245, 200, 66, 0.1);
 }
 
 .market-context-body.collapsed {
@@ -1289,10 +1362,10 @@ input[type="text"]::placeholder {
 }
 
 .value-badge.sleeper {
-    background: rgba(0, 255, 136, 0.2);
+    background: rgba(245, 200, 66, 0.2);
     border-color: var(--neon-green);
     color: var(--neon-green);
-    box-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+    box-shadow: 0 0 10px rgba(245, 200, 66, 0.4);
 }
 
 .value-badge.bust {
@@ -1319,9 +1392,9 @@ input[type="text"]::placeholder {
     font-weight: 700;
     text-transform: uppercase;
     border: 2px solid var(--neon-cyan);
-    background: rgba(0, 255, 255, 0.15);
+    background: rgba(245, 200, 66, 0.15);
     color: var(--neon-cyan);
-    box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
+    box-shadow: 0 0 8px rgba(245, 200, 66, 0.3);
 }
 
 /* ========================================
@@ -1489,7 +1562,7 @@ input[type="text"]::placeholder {
 }
 
 .roster-section-icon.hitter {
-    background: rgba(0, 255, 136, 0.2);
+    background: rgba(245, 200, 66, 0.2);
     border-color: var(--neon-green);
 }
 
@@ -1505,7 +1578,7 @@ input[type="text"]::placeholder {
     min-width: 1.75rem;
     height: 1.75rem;
     padding: 0 0.5rem;
-    background: rgba(0, 240, 255, 0.1);
+    background: rgba(245, 200, 66, 0.1);
     border: 2px solid var(--neon-cyan);
     border-radius: var(--radius-md);
     font-family: 'Orbitron', sans-serif;
@@ -1520,13 +1593,13 @@ input[type="text"]::placeholder {
     align-items: center;
     padding: 0.75rem 1rem;
     background: rgba(0, 0, 0, 0.3);
-    border: 2px solid rgba(0, 240, 255, 0.3);
+    border: 2px solid rgba(245, 200, 66, 0.3);
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
 }
 
 .roster-player-card:hover {
-    background: rgba(0, 240, 255, 0.1);
+    background: rgba(245, 200, 66, 0.1);
     border-color: var(--neon-cyan);
     transform: translateX(4px);
     box-shadow: var(--glow-cyan);
@@ -1559,7 +1632,7 @@ input[type="text"]::placeholder {
 
 .roster-summary {
     padding: 1rem;
-    background: linear-gradient(135deg, rgba(0, 255, 136, 0.1) 0%, rgba(0, 0, 0, 0.3) 100%);
+    background: linear-gradient(135deg, rgba(245, 200, 66, 0.1) 0%, rgba(0, 0, 0, 0.3) 100%);
     border: 2px solid var(--neon-green);
     border-radius: var(--radius-lg);
 }
@@ -1591,7 +1664,7 @@ input[type="text"]::placeholder {
 
 .upside-highlight {
     padding: 0.5rem 0.75rem;
-    background: rgba(0, 255, 136, 0.1);
+    background: rgba(245, 200, 66, 0.1);
     border: 2px solid var(--neon-green);
     border-radius: var(--radius-md);
 }
@@ -1657,7 +1730,7 @@ input[type="text"]::placeholder {
    Loading Spinner - Game Style
    ======================================== */
 .spinner {
-    border: 3px solid rgba(0, 240, 255, 0.2);
+    border: 3px solid rgba(245, 200, 66, 0.2);
     border-top: 3px solid var(--neon-cyan);
     border-radius: 50%;
     width: 30px;
@@ -1790,7 +1863,7 @@ input[type="text"]::placeholder {
 
 .strength-gain {
     padding: 0.125rem 0.375rem;
-    background: rgba(0, 255, 136, 0.2);
+    background: rgba(245, 200, 66, 0.2);
     border: 1px solid var(--neon-green);
     border-radius: var(--radius-sm);
     color: var(--neon-green);
@@ -1805,6 +1878,8 @@ input[type="text"]::placeholder {
 .scarcity-alert-item {
     border: 1px solid var(--neon-red);
     background: rgba(255, 51, 102, 0.1);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     animation: scarcity-pulse 2s ease-in-out infinite;
 }
 
@@ -1879,7 +1954,7 @@ input[type="text"]::placeholder {
 }
 
 .scarcity-urgency-badge.low {
-    background: rgba(0, 255, 136, 0.12);
+    background: rgba(245, 200, 66, 0.12);
     color: var(--neon-green);
     border-color: var(--neon-green);
 }
@@ -1963,7 +2038,7 @@ input[type="text"]::placeholder {
 
 .hp-seg.filled.low {
     background: linear-gradient(180deg, #44ffaa, #00cc66);
-    box-shadow: 0 0 4px rgba(0,255,136,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
+    box-shadow: 0 0 4px rgba(245, 200, 66,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
 }
 
 .hp-seg.empty {
@@ -2091,7 +2166,7 @@ input[type="text"]::placeholder {
 
 .hp-seg-legend.filled {
     background: linear-gradient(180deg, rgba(255,255,255,0.3), var(--neon-cyan));
-    box-shadow: 0 0 4px rgba(0,240,255,0.5);
+    box-shadow: 0 0 4px rgba(245, 200, 66,0.5);
 }
 
 .hp-seg-legend.empty {
@@ -2115,10 +2190,10 @@ input[type="text"]::placeholder {
 }
 
 .stat-chip.elite {
-    background: rgba(0, 255, 136, 0.12);
+    background: rgba(245, 200, 66, 0.12);
     color: var(--neon-green);
-    border-color: rgba(0, 255, 136, 0.35);
-    box-shadow: 0 0 6px rgba(0, 255, 136, 0.2);
+    border-color: rgba(245, 200, 66, 0.35);
+    box-shadow: 0 0 6px rgba(245, 200, 66, 0.2);
 }
 
 .stat-chip.good {
@@ -2183,13 +2258,13 @@ input[type="text"]::placeholder {
 
 .action-btn.draft {
     color: var(--neon-green);
-    border-color: rgba(0, 255, 136, 0.4);
-    box-shadow: 0 0 4px rgba(0, 255, 136, 0.15);
+    border-color: rgba(245, 200, 66, 0.4);
+    box-shadow: 0 0 4px rgba(245, 200, 66, 0.15);
 }
 
 .action-btn.draft:hover {
-    background: rgba(0, 255, 136, 0.15);
-    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+    background: rgba(245, 200, 66, 0.15);
+    box-shadow: 0 0 10px rgba(245, 200, 66, 0.3);
     border-color: var(--neon-green);
 }
 
@@ -2207,15 +2282,15 @@ input[type="text"]::placeholder {
 
 .action-btn.compare:hover {
     color: var(--neon-cyan);
-    border-color: rgba(0, 240, 255, 0.3);
-    box-shadow: 0 0 6px rgba(0, 240, 255, 0.15);
+    border-color: rgba(245, 200, 66, 0.3);
+    box-shadow: 0 0 6px rgba(245, 200, 66, 0.15);
 }
 
 .action-btn.compare.active {
     color: var(--neon-cyan);
     border-color: var(--neon-cyan);
-    background: rgba(0, 240, 255, 0.12);
-    box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+    background: rgba(245, 200, 66, 0.12);
+    box-shadow: 0 0 8px rgba(245, 200, 66, 0.3);
 }
 
 .action-btn.drafted-label {
@@ -2262,7 +2337,7 @@ input[type="text"]::placeholder {
 }
 
 .tier-badge.uncommon-tier {
-    background: rgba(0, 240, 255, 0.1);
+    background: rgba(245, 200, 66, 0.1);
     color: var(--neon-cyan);
     border-color: var(--neon-cyan);
 }
@@ -2390,6 +2465,22 @@ input[type="text"]::placeholder {
     opacity: 0.7;
 }
 
+.compare-injury-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: 'Chakra Petch', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--neon-red);
+    background: rgba(255, 23, 68, 0.15);
+    border: 1px solid rgba(255, 23, 68, 0.4);
+    border-radius: 3px;
+}
+
 /* ========================================
    Keeper Management
    ======================================== */
@@ -2477,8 +2568,8 @@ input[type="text"]::placeholder {
     display: inline-flex;
     align-items: center;
     padding: 0.2rem 0.65rem;
-    background: rgba(0, 240, 255, 0.08);
-    border: 1px solid rgba(0, 240, 255, 0.25);
+    background: rgba(245, 200, 66, 0.08);
+    border: 1px solid rgba(245, 200, 66, 0.25);
     border-radius: 9999px;
     font-family: 'Rajdhani', sans-serif;
     font-size: 0.8rem;
@@ -2521,7 +2612,7 @@ input[type="text"]::placeholder {
 
 /* Outlined pill button — Sync */
 header button.header-outline-btn {
-    border: 1.5px solid rgba(0, 240, 255, 0.4) !important;
+    border: 1.5px solid rgba(245, 200, 66, 0.4) !important;
     background: transparent !important;
     color: var(--neon-cyan) !important;
     font-family: 'Rajdhani', sans-serif !important;
@@ -2534,7 +2625,7 @@ header button.header-outline-btn {
 }
 
 header button.header-outline-btn:hover {
-    background: rgba(0, 240, 255, 0.12) !important;
+    background: rgba(245, 200, 66, 0.12) !important;
     border-color: var(--neon-cyan) !important;
     transform: none !important;
     box-shadow: none !important;
@@ -2556,7 +2647,7 @@ header button.header-ghost-btn {
 
 header button.header-ghost-btn:hover {
     color: var(--neon-cyan) !important;
-    background: rgba(0, 240, 255, 0.08) !important;
+    background: rgba(245, 200, 66, 0.08) !important;
     transform: none !important;
     box-shadow: none !important;
 }
@@ -2573,7 +2664,7 @@ header button.header-icon-btn {
 }
 
 header button.header-icon-btn:hover {
-    background: rgba(0, 240, 255, 0.1) !important;
+    background: rgba(245, 200, 66, 0.1) !important;
     color: var(--neon-cyan) !important;
     transform: none !important;
     box-shadow: none !important;
@@ -2593,9 +2684,9 @@ header button.header-icon-btn:hover {
     top: calc(100% + 6px);
     width: 175px;
     background: rgba(10, 10, 18, 0.98);
-    border: 1.5px solid rgba(0, 240, 255, 0.25);
+    border: 1.5px solid rgba(245, 200, 66, 0.25);
     border-radius: var(--radius-lg);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(0, 240, 255, 0.08);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(245, 200, 66, 0.08);
     z-index: 100;
     padding: 0.35rem;
 }
@@ -2621,7 +2712,7 @@ header button.header-icon-btn:hover {
 .sync-dropdown-item::before { display: none !important; }
 
 .sync-dropdown-item:hover {
-    background: rgba(0, 240, 255, 0.1) !important;
+    background: rgba(245, 200, 66, 0.1) !important;
     color: var(--neon-cyan) !important;
     transform: none !important;
     box-shadow: none !important;
@@ -2641,8 +2732,8 @@ header button.header-icon-btn:hover {
     font-family: 'Rajdhani', sans-serif;
     font-size: 0.7rem;
     font-weight: 600;
-    border: 1.5px solid rgba(0, 240, 255, 0.3) !important;
-    background: rgba(0, 240, 255, 0.04) !important;
+    border: 1.5px solid rgba(245, 200, 66, 0.3) !important;
+    background: rgba(245, 200, 66, 0.04) !important;
     color: var(--neon-cyan) !important;
     border-radius: var(--radius-md) !important;
     padding: 0 !important;
@@ -2651,10 +2742,10 @@ header button.header-icon-btn:hover {
 }
 
 #draft-session-bar .draft-icon-btn:not(:disabled):hover {
-    background: rgba(0, 240, 255, 0.15) !important;
+    background: rgba(245, 200, 66, 0.15) !important;
     border-color: var(--neon-cyan) !important;
     transform: none !important;
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important;
+    box-shadow: 0 0 10px rgba(245, 200, 66, 0.2) !important;
 }
 
 #draft-session-bar .draft-icon-btn:disabled {
@@ -2669,9 +2760,9 @@ header button.header-icon-btn:hover {
     top: calc(100% + 6px);
     width: 200px;
     background: rgba(10, 10, 18, 0.98);
-    border: 1.5px solid rgba(0, 240, 255, 0.25);
+    border: 1.5px solid rgba(245, 200, 66, 0.25);
     border-radius: var(--radius-lg);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(0, 240, 255, 0.08);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(245, 200, 66, 0.08);
     z-index: 100;
     padding: 0.35rem;
 }
@@ -2697,7 +2788,7 @@ header button.header-icon-btn:hover {
 #draft-session-bar .overflow-menu-item::before { display: none !important; }
 
 #draft-session-bar .overflow-menu-item:hover {
-    background: rgba(0, 240, 255, 0.1) !important;
+    background: rgba(245, 200, 66, 0.1) !important;
     color: var(--neon-cyan) !important;
     transform: none !important;
     box-shadow: none !important;
@@ -2707,7 +2798,7 @@ header button.header-icon-btn:hover {
 
 .overflow-menu-divider {
     height: 1px;
-    background: rgba(0, 240, 255, 0.1);
+    background: rgba(245, 200, 66, 0.1);
     margin: 0.25rem 0.25rem;
 }
 
@@ -2748,6 +2839,81 @@ header button.header-icon-btn:hover {
 
 #draft-session-bar .xp-text {
     display: none;
+}
+
+/* ========================================
+   Pick Timeline — horizontal draft order strip
+   ======================================== */
+.pick-timeline {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.pick-timeline::-webkit-scrollbar { display: none; }
+
+.pick-timeline-inner {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 0;
+    min-width: max-content;
+}
+
+.pick-chip {
+    flex-shrink: 0;
+    min-width: 26px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    font-size: 0.55rem;
+    font-weight: 600;
+    font-family: 'Chakra Petch', sans-serif;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: default;
+}
+
+.pick-chip-user {
+    background: rgba(129, 199, 132, 0.15);
+    border-color: rgba(129, 199, 132, 0.5);
+    color: var(--neon-green);
+    font-weight: 700;
+}
+
+.pick-chip-current {
+    background: rgba(245, 200, 66, 0.18);
+    border: 2px solid var(--neon-amber);
+    color: var(--neon-amber);
+    font-weight: 700;
+    animation: pickChipPulse 1.5s ease-in-out infinite;
+}
+
+.pick-chip-past {
+    opacity: 0.25;
+}
+
+.pick-round-sep {
+    flex-shrink: 0;
+    font-size: 0.5rem;
+    font-weight: 700;
+    font-family: 'Orbitron', sans-serif;
+    color: var(--text-muted);
+    padding: 0 5px;
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+    margin-left: 3px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+}
+
+@keyframes pickChipPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
 }
 
 /* ========================================

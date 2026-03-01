@@ -47,7 +47,7 @@ class _MockRecEngine:
     def get_category_specialists(self, players, limit=5):
         return []
 
-    def get_prospect_picks(self, players, limit=10):
+    def get_prospect_picks(self, players, limit=25):
         return []
 
     def get_position_scarcity_report(self, **kwargs):

@@ -18,6 +18,7 @@ let players = [];
 let recommendations = {};
 let scarcityData = null;
 let categoryPlanner = null;
+let _defaultPlannerTargets = null;  // cached on first planner render
 let valueClassifications = {};  // Sleeper/bust classifications by player ID
 let surplusValues = {};         // VORP surplus values by player ID
 let currentLeagueId = null;
@@ -52,6 +53,50 @@ const ACHIEVEMENTS = {
     power_hitter: { icon: 'HR', name: 'Power Surge', desc: 'Drafted a 30+ HR hitter' },
     speed_demon: { icon: 'SB', name: 'Speed Demon', desc: 'Drafted a 20+ SB player' },
     sleeper_pick: { icon: 'SLEEPER', name: 'Hidden Gem', desc: 'Drafted a sleeper pick' },
+};
+
+const DRAFT_STRATEGIES = {
+    balanced: {
+        label: 'Balanced',
+        emoji: '⚖️',
+        description: 'Even coverage across all 12 categories',
+        adjustments: {}  // all ×1.0 — just restores defaults
+    },
+    power: {
+        label: 'Power Hitter',
+        emoji: '💪',
+        description: 'Prioritize HR/RBI/OPS — punt SB',
+        adjustments: { runs:1.05, hr:1.25, rbi:1.15, sb:0.60, avg:0.99, ops:1.06,
+                       wins:0.95, strikeouts:1.0, era:1.0, whip:1.0, saves:0.85, quality_starts:0.95 }
+    },
+    speed: {
+        label: 'Speed & Contact',
+        emoji: '⚡',
+        description: 'Prioritize SB/AVG/Runs — punt HR',
+        adjustments: { runs:1.12, hr:0.70, rbi:0.88, sb:1.55, avg:1.04, ops:0.97,
+                       wins:0.95, strikeouts:1.0, era:1.0, whip:1.0, saves:0.90, quality_starts:0.95 }
+    },
+    aces: {
+        label: 'Ace Pitchers',
+        emoji: '🎯',
+        description: 'Prioritize W/K/ERA/QS — lighter saves',
+        adjustments: { runs:0.95, hr:0.88, rbi:0.93, sb:0.85, avg:1.0, ops:0.98,
+                       wins:1.25, strikeouts:1.30, era:0.92, whip:0.94, saves:0.55, quality_starts:1.35 }
+    },
+    closers: {
+        label: 'Closer Heavy',
+        emoji: '🔒',
+        description: 'Stack closers for SV/K — lighter on starters',
+        adjustments: { runs:1.0, hr:1.0, rbi:1.0, sb:0.90, avg:1.0, ops:1.0,
+                       wins:0.65, strikeouts:1.10, era:1.05, whip:1.02, saves:1.65, quality_starts:0.55 }
+    },
+    punt_pitching: {
+        label: 'Punt Pitching',
+        emoji: '🏏',
+        description: 'Dominate offense — sacrifice pitching categories',
+        adjustments: { runs:1.20, hr:1.22, rbi:1.15, sb:1.15, avg:1.02, ops:1.06,
+                       wins:0.50, strikeouts:0.60, era:1.30, whip:1.12, saves:0.50, quality_starts:0.50 }
+    },
 };
 
 // Draft Order State
@@ -866,9 +911,9 @@ function renderCategoryPlannerUnavailable(message = 'Planner unavailable') {
         : 'Planner data is temporarily unavailable. Recommendations are still loaded.';
 
     container.innerHTML = `
-        <div class="bg-gray-900/60 border border-gray-700 rounded-lg p-3">
+        <div class="bg-gray-900/60 backdrop-blur-sm border border-gray-700 rounded-lg p-3">
             <p class="text-sm text-indigo-300 mb-1">Category Planner</p>
-            <p class="text-xs text-gray-400">${escapeHtml(body)}</p>
+            <p class="text-sm text-gray-400">${escapeHtml(body)}</p>
         </div>
     `;
 }
@@ -877,17 +922,21 @@ function renderCategoryPlanner() {
     const container = document.getElementById('planner-dashboard');
     if (!container || !categoryPlanner) return;
 
+    if (_defaultPlannerTargets === null && categoryPlanner.targets) {
+        _defaultPlannerTargets = { ...categoryPlanner.targets };
+    }
+
     const focusCards = (categoryPlanner.focus_plan || []).map(focus => `
-        <div class="bg-gray-800/60 border border-gray-700 rounded-lg p-3">
+        <div class="bg-gray-800/60 backdrop-blur-sm border border-gray-700 rounded-lg p-3">
             <div class="flex justify-between items-center mb-2">
                 <span class="text-sm font-semibold text-amber-300">${focus.category.toUpperCase()}</span>
-                <span class="text-xs text-red-300">${Number(focus.deficit_pct).toFixed(1)}% deficit</span>
+                <span class="text-sm text-red-300">${Number(focus.deficit_pct).toFixed(1)}% deficit</span>
             </div>
-            <p class="text-xs text-gray-400 mb-2">Priority positions: ${escapeHtml(focus.suggested_positions)}</p>
+            <p class="text-sm text-gray-400 mb-2">Priority positions: ${escapeHtml(focus.suggested_positions)}</p>
             ${(focus.top_options || []).length > 0 ? `
                 <div class="space-y-1">
                     ${(focus.top_options || []).map(o => `
-                        <div class="flex justify-between text-xs">
+                        <div class="flex justify-between text-sm">
                             <button onclick="showPlayerDetail(${o.player_id})" class="text-blue-300 hover:text-blue-200">
                                 ${escapeHtml(o.player_name)} (${escapeHtml(o.positions)})
                             </button>
@@ -895,23 +944,23 @@ function renderCategoryPlanner() {
                         </div>
                     `).join('')}
                 </div>
-            ` : '<p class="text-xs text-gray-500">No clear options in current player pool.</p>'}
+            ` : '<p class="text-sm text-gray-500">No clear options in current player pool.</p>'}
         </div>
     `).join('');
 
     const topNeedsRows = (categoryPlanner.needs || []).slice(0, 6).map(need => `
         <tr class="border-b border-gray-800">
-            <td class="py-1 text-xs font-medium ${need.status === 'behind' ? 'text-red-300' : 'text-emerald-300'}">${need.category.toUpperCase()}</td>
-            <td class="py-1 text-xs text-right text-gray-300">${need.projected_final}</td>
-            <td class="py-1 text-xs text-right text-gray-400">${need.target}</td>
-            <td class="py-1 text-xs text-right ${need.gap > 0 ? 'text-red-300' : 'text-emerald-300'}">${need.gap > 0 ? '+' : ''}${need.gap}</td>
+            <td class="py-1 text-sm font-medium ${need.status === 'behind' ? 'text-red-300' : 'text-emerald-300'}">${need.category.toUpperCase()}</td>
+            <td class="py-1 text-sm text-right text-gray-300">${need.projected_final}</td>
+            <td class="py-1 text-sm text-right text-gray-400">${need.target}</td>
+            <td class="py-1 text-sm text-right ${need.gap > 0 ? 'text-red-300' : 'text-emerald-300'}">${need.gap > 0 ? '+' : ''}${need.gap}</td>
         </tr>
     `).join('');
 
     const targetInputs = Object.entries(categoryPlanner.targets || {}).map(([category, value]) => {
         const isRatio = ['avg', 'ops', 'era', 'whip'].includes(category);
         return `
-            <label class="flex items-center justify-between gap-2 text-xs">
+            <label class="flex items-center justify-between gap-2 text-sm">
                 <span class="text-gray-400 w-10">${category.toUpperCase()}</span>
                 <input
                     data-category="${category}"
@@ -925,27 +974,27 @@ function renderCategoryPlanner() {
     }).join('');
 
     container.innerHTML = `
-        <div class="bg-gray-900/60 border border-indigo-700/40 rounded-lg p-3 mb-3">
+        <div class="bg-gray-900/60 backdrop-blur-sm border border-indigo-700/40 rounded-lg p-3 mb-3">
             <div class="flex items-center justify-between mb-2">
                 <h4 class="text-sm font-semibold text-indigo-300">Draft Pace Planner</h4>
-                <span class="text-xs text-gray-400">${categoryPlanner.team_picks_made}/${categoryPlanner.team_pick_target} picks</span>
+                <span class="text-sm text-gray-400">${categoryPlanner.team_picks_made}/${categoryPlanner.team_pick_target} picks</span>
             </div>
-            <p class="text-xs text-gray-300 mb-2">${escapeHtml(categoryPlanner.summary)}</p>
+            <p class="text-sm text-gray-300 mb-2">${escapeHtml(categoryPlanner.summary)}</p>
             <div class="h-2 rounded bg-gray-800 overflow-hidden mb-1">
                 <div class="h-full bg-indigo-500" style="width: ${Math.max(2, categoryPlanner.completion_pct)}%"></div>
             </div>
-            <p class="text-[11px] text-gray-500">${categoryPlanner.completion_pct}% draft completion</p>
+            <p class="text-xs text-gray-500">${categoryPlanner.completion_pct}% draft completion</p>
         </div>
 
         <div class="grid grid-cols-1 gap-3 mb-3">
-            ${focusCards || '<p class="text-xs text-gray-500">No major deficits detected.</p>'}
+            ${focusCards || '<p class="text-sm text-gray-500">No major deficits detected.</p>'}
         </div>
 
-        <div class="bg-gray-900/60 border border-gray-700 rounded-lg p-3 mb-3">
+        <div class="bg-gray-900/60 backdrop-blur-sm border border-gray-700 rounded-lg p-3 mb-3">
             <p class="text-xs uppercase tracking-wide text-gray-500 mb-2">Top Category Gaps</p>
             <table class="w-full">
                 <thead>
-                    <tr class="text-[11px] text-gray-500">
+                    <tr class="text-xs text-gray-500">
                         <th class="text-left py-1">Cat</th>
                         <th class="text-right py-1">Proj</th>
                         <th class="text-right py-1">Target</th>
@@ -956,17 +1005,30 @@ function renderCategoryPlanner() {
             </table>
         </div>
 
-        <div class="bg-gray-900/60 border border-gray-700 rounded-lg p-3">
+        <div class="bg-gray-900/60 backdrop-blur-sm border border-gray-700 rounded-lg p-3">
             <div class="flex items-center justify-between mb-2">
                 <p class="text-xs uppercase tracking-wide text-gray-500">Custom Targets</p>
                 <div class="flex gap-2">
-                    <button onclick="savePlannerTargets()" class="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded">Save</button>
-                    <button onclick="resetPlannerTargets()" class="text-xs px-2 py-1 border border-gray-600 hover:bg-gray-800 rounded">Reset</button>
+                    <button onclick="savePlannerTargets()" class="text-sm px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded">Save</button>
+                    <button onclick="resetPlannerTargets()" class="text-sm px-2 py-1 border border-gray-600 hover:bg-gray-800 rounded">Reset</button>
                 </div>
+            </div>
+            <div class="mb-3">
+                <label class="text-sm text-gray-500 block mb-1">Draft Strategy Preset</label>
+                <select id="strategy-preset-select"
+                    onchange="applyDraftStrategy(this.value)"
+                    class="w-full px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-gray-200 focus:border-indigo-500">
+                    <option value="">— Pick a strategy —</option>
+                    ${Object.entries(DRAFT_STRATEGIES).map(([key, s]) =>
+                        `<option value="${key}" ${key === 'balanced' ? 'selected' : ''}>${s.emoji} ${s.label}</option>`
+                    ).join('')}
+                </select>
+                <p id="strategy-description" class="text-sm text-gray-500 mt-1 italic"></p>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${targetInputs}</div>
         </div>
     `;
+    applyDraftStrategy('balanced');
 }
 
 async function savePlannerTargets() {
@@ -991,7 +1053,32 @@ async function resetPlannerTargets() {
         method: 'POST',
         body: JSON.stringify({ targets: {} }),
     });
+    _defaultPlannerTargets = { ...categoryPlanner.targets };
     renderCategoryPlanner();
+}
+
+function applyDraftStrategy(key) {
+    if (!key || !DRAFT_STRATEGIES[key]) {
+        const descEl = document.getElementById('strategy-description');
+        if (descEl) descEl.textContent = '';
+        return;
+    }
+    const strategy = DRAFT_STRATEGIES[key];
+    const base = _defaultPlannerTargets || categoryPlanner.targets || {};
+    const isRatio = ['avg', 'ops', 'era', 'whip'];
+
+    const descEl = document.getElementById('strategy-description');
+    if (descEl) descEl.textContent = strategy.description;
+
+    document.querySelectorAll('.planner-target-input').forEach(input => {
+        const cat = input.dataset.category;
+        const baseVal = base[cat];
+        if (baseVal === undefined) return;
+        const mult = strategy.adjustments[cat] ?? 1.0;
+        const newVal = baseVal * mult;
+        const precision = isRatio.includes(cat) ? 3 : 0;
+        input.value = precision > 0 ? newVal.toFixed(precision) : Math.round(newVal);
+    });
 }
 
 // Load scarcity data
@@ -1160,8 +1247,8 @@ function renderRecommendations() {
                         <span class="text-sm font-mono text-gray-400">#${heroPick.player.consensus_rank || '--'}</span>
                     </div>
                 </div>
-                <p class="text-sm text-white font-medium mb-3 leading-relaxed">${heroPick.summary}</p>
-                <ul class="text-sm text-gray-300 mb-3 space-y-1.5">
+                <p class="text-base text-white font-medium mb-3 leading-relaxed">${heroPick.summary}</p>
+                <ul class="text-base text-gray-300 mb-3 space-y-1.5">
                     ${(heroPick.reasoning || []).map(r => `
                         <li class="flex items-start gap-2">
                             <span class="text-yellow-400 mt-0.5 flex-shrink-0">→</span>
@@ -1183,54 +1270,79 @@ function renderRecommendations() {
         heroContainer.innerHTML = '<p class="text-gray-500 text-sm py-2">Loading recommendations...</p>';
     }
 
-    // 2. Also Consider — unified compact list merging all remaining picks
-    const alsoConsiderItems = [];
-
-    // Remaining recommended picks (index 1+)
-    (recommendations.recommended || []).slice(1).forEach(p =>
-        alsoConsiderItems.push({ pick: p, pickType: 'recommended', typeLabel: 'TOP PICK',
-            hoverColor: 'hover:text-yellow-400', detail: p.summary }));
-
-    // Safe picks
-    (recommendations.safe || []).forEach(p =>
-        alsoConsiderItems.push({ pick: p, pickType: 'safe', typeLabel: 'SAFE',
-            hoverColor: 'hover:text-emerald-400', detail: p.rationale }));
-
-    // Risky picks
-    (recommendations.risky || []).forEach(p =>
-        alsoConsiderItems.push({ pick: p, pickType: 'risky', typeLabel: 'RISKY',
-            hoverColor: 'hover:text-orange-400', detail: p.upside ? `Upside: ${p.upside}` : p.rationale }));
-
-    // Needs-based picks
-    (recommendations.category_needs || []).forEach(p =>
-        alsoConsiderItems.push({ pick: p, pickType: 'needs', typeLabel: `FILLS ${(p.need_addressed || 'GAP').toUpperCase()}`,
-            hoverColor: 'hover:text-blue-400',
-            detail: `+${Math.round((p.projected_strength || 0) - (p.current_strength || 0))}% ${p.need_addressed || ''}` }));
-
-    const alsoConsiderContainer = document.getElementById('also-consider-picks');
-    if (alsoConsiderItems.length > 0) {
-        alsoConsiderContainer.innerHTML = alsoConsiderItems.map((item, index) => `
-            <div class="compact-pick-row animate-slide-up" style="animation-delay: ${index * 40}ms" title="${item.detail}">
-                <button onclick="showPlayerDetail(${item.pick.player.id})" class="compact-pick-name ${item.hoverColor}">
-                    ${item.pick.player.name}
-                </button>
-                <div class="compact-pick-meta">
-                    <span class="text-xs text-gray-500">${item.pick.player.team || 'FA'}</span>
-                    ${renderPositionBadge(item.pick.player.positions)}
-                </div>
-                <div class="compact-pick-right">
-                    <span class="pick-type-badge pick-type-${item.pickType}">${item.typeLabel}</span>
-                    <span class="text-xs text-gray-500 font-mono">#${item.pick.player.consensus_rank || '--'}</span>
-                </div>
-            </div>
-        `).join('');
-    } else {
-        alsoConsiderContainer.innerHTML = '<p class="text-gray-500 text-sm py-2">No additional picks available</p>';
+    // 2. Also Consider — Best Available By Position grid
+    function getCanonicalPosition(player) {
+        const raw = (player.primary_position ||
+                     (player.positions || '').split(/[\/,]/)[0].trim()).toUpperCase();
+        if (['LF','CF','RF','DH'].includes(raw)) return 'OF';
+        if (raw === 'P') return 'SP';
+        return raw;
     }
 
-    // 3. Prospects (keeper-focused collapsible)
-    const prospectsContainer = document.getElementById('prospect-picks');
-    prospectsContainer.innerHTML = (recommendations.prospects || []).map((pick, index) => `
+    const POSITIONS = ['C','1B','2B','3B','SS','OF','SP','RP'];
+    const heroId = heroPick?.player?.id;
+    const bestByPos = {};
+
+    const pools = [
+        ...(recommendations.recommended || []).map(p => ({pick: p, type: 'recommended'})),
+        ...(recommendations.safe        || []).map(p => ({pick: p, type: 'safe'})),
+        ...(recommendations.risky       || []).map(p => ({pick: p, type: 'risky'})),
+        ...(recommendations.category_needs || []).map(p => ({pick: p, type: 'needs'})),
+    ];
+
+    for (const {pick, type} of pools) {
+        if (pick.player.id === heroId) continue;
+        const pos = getCanonicalPosition(pick.player);
+        if (POSITIONS.includes(pos) && !bestByPos[pos]) {
+            bestByPos[pos] = {pick, type};
+        }
+    }
+
+    const typeColors = {
+        recommended: 'var(--neon-amber)',
+        safe:        'var(--neon-green)',
+        risky:       'var(--neon-orange)',
+        needs:       'var(--neon-blue)',
+    };
+
+    const alsoHtml = POSITIONS.map(pos => {
+        const entry = bestByPos[pos];
+        if (!entry) {
+            return `<div class="pos-chip pos-chip-empty">
+                <span class="pos-chip-label">${pos}</span>
+                <span class="pos-chip-name">—</span>
+            </div>`;
+        }
+        const {pick, type} = entry;
+        const p = pick.player;
+        const rank = p.consensus_rank ? `#${p.consensus_rank}` : '—';
+        const color = typeColors[type] || 'var(--text-secondary)';
+        const detail = pick.summary || pick.rationale || '';
+        const shortName = p.name.split(' ').slice(-1)[0];
+        return `<div class="pos-chip" title="${p.name} · ${rank} · ${detail}"
+                     onclick="showPlayerDetail(${p.id})" style="cursor:pointer">
+            <span class="pos-chip-label">${pos}</span>
+            <span class="pos-chip-name" style="color:${color}">${shortName}</span>
+            <span class="pos-chip-rank">${rank}</span>
+        </div>`;
+    }).join('');
+
+    document.getElementById('also-consider-picks').innerHTML =
+        `<div class="pos-grid">${alsoHtml}</div>`;
+
+}
+
+function renderProspects() {
+    const container = document.getElementById('prospect-picks');
+    if (!container) return;
+
+    const prospects = (recommendations && recommendations.prospects) || [];
+    if (prospects.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm py-4 text-center">No prospects available. Load recommendations first.</p>';
+        return;
+    }
+
+    container.innerHTML = prospects.map((pick, index) => `
         <div class="compact-pick-row animate-slide-up" style="animation-delay: ${index * 50}ms">
             <div class="flex-1 min-w-0">
                 <button onclick="showPlayerDetail(${pick.player.id})" class="compact-pick-name hover:text-purple-400 block">
@@ -1247,7 +1359,7 @@ function renderRecommendations() {
                 <span class="keeper-value-badge ${pick.keeper_value}">${pick.keeper_value}</span>
             </div>
         </div>
-    `).join('') || '<p class="text-gray-500 text-sm py-2">No prospects available</p>';
+    `).join('');
 }
 
 // Update draft info
@@ -1334,32 +1446,39 @@ async function showPlayerDetail(playerId) {
         console.log('Player data:', player.name, 'age:', player.age, 'rank:', player.consensus_rank);
         document.getElementById('modal-age').textContent = player.age != null ? player.age : '--';
 
-        // ADP Gap (ESPN ADP vs Average Ranking)
+        // ADP Gap (multi-source ADP average vs FantasyPros ECR avg_rank)
         const adpGapEl = document.getElementById('modal-adp-gap');
         const rankings = player.rankings || [];
 
-        // Find ESPN ADP
-        const espnRanking = rankings.find(r => r.source_name && r.source_name.toLowerCase().includes('espn') && r.adp);
-        const espnAdp = espnRanking ? espnRanking.adp : null;
-
-        // Calculate average rank from all sources with overall_rank
-        const ranksWithOverall = rankings.filter(r => r.overall_rank != null);
-        const avgRank = ranksWithOverall.length > 0
-            ? ranksWithOverall.reduce((sum, r) => sum + r.overall_rank, 0) / ranksWithOverall.length
+        // Multi-source ADP average (ESPN + FantasyPros ADP + NFBC, etc.)
+        const adpRankings = rankings.filter(r => r.adp != null);
+        const avgAdpForGap = adpRankings.length > 0
+            ? adpRankings.reduce((sum, r) => sum + r.adp, 0) / adpRankings.length
             : null;
 
-        if (espnAdp != null && avgRank != null) {
-            // Positive = being drafted later than ranked (value), Negative = drafted earlier (reach)
-            const gap = Math.round(espnAdp - avgRank);
+        // Prefer FantasyPros ECR avg_rank as expert consensus reference; fall back to overall_rank average
+        const fpEcr = rankings.find(r => r.source_name === 'FantasyPros ECR' && r.avg_rank != null);
+        const ranksWithOverall = rankings.filter(r => r.overall_rank != null);
+        const ecr = fpEcr
+            ? fpEcr.avg_rank
+            : (ranksWithOverall.length > 0
+                ? ranksWithOverall.reduce((s, r) => s + r.overall_rank, 0) / ranksWithOverall.length
+                : null);
+
+        if (avgAdpForGap != null && ecr != null) {
+            // Positive = being drafted later than ranked (value/sleeper), Negative = drafted earlier (reach/bust)
+            const gap = Math.round(avgAdpForGap - ecr);
             adpGapEl.textContent = gap > 0 ? `+${gap}` : `${gap}`;
-            // Green for value picks, red for reaches
-            adpGapEl.className = `text-xl font-bold ${gap > 5 ? 'text-emerald-400' : gap < -5 ? 'text-red-400' : 'text-white'}`;
-        } else if (avgRank != null) {
-            adpGapEl.textContent = '--';
-            adpGapEl.className = 'text-xl font-bold text-gray-500';
+            adpGapEl.className = `text-xl font-bold ${gap >= 15 ? 'text-emerald-400' : gap <= -15 ? 'text-red-400' : 'text-white'}`;
+
+            // Tooltip: show which sources contributed
+            const adpParts = adpRankings.map(r => `${r.source_name}: ${Math.round(r.adp)}`).join(', ');
+            const ecrLabel = fpEcr ? `ECR (FP): ${Math.round(ecr)}` : `ECR (avg rank): ${Math.round(ecr)}`;
+            adpGapEl.title = `${adpParts} → Avg ADP: ${Math.round(avgAdpForGap)} | ${ecrLabel} → Gap: ${gap > 0 ? '+' : ''}${gap}`;
         } else {
             adpGapEl.textContent = '--';
             adpGapEl.className = 'text-xl font-bold text-gray-500';
+            adpGapEl.title = '';
         }
 
         // Rank
@@ -2304,14 +2423,17 @@ function showTab(tabName) {
     // Load tab-specific data
     if (tabName === 'my-team') {
         loadMyTeam();
-    } else if (tabName === 'draft-history') {
-        loadDraftHistory();
-    } else if (tabName === 'teams') {
+    } else if (tabName === 'market') {
+        renderScarcityDashboard();
+        renderCategoryPlanner();
+    } else if (tabName === 'prospects') {
+        renderProspects();
+    } else if (tabName === 'keepers') {
+        loadKeepers();
         loadTeamsTabConfig();
         updateTeamSelector();
         loadClaimableTeams();
-    } else if (tabName === 'keepers') {
-        loadKeepers();
+        loadDraftHistory();
     }
 }
 
@@ -4153,7 +4275,7 @@ function updateTeamNamesContainer(numTeams) {
         div.innerHTML = `
             <span class="text-xs text-gray-500 w-6">${i}.</span>
             <input type="text" id="team-name-${i}" placeholder="Team ${i}" value="${escapeHtml(prefill)}"
-                   class="flex-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm focus:border-amber-500 focus:outline-none">
+                   class="flex-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm focus:border-amber-500">
         `;
         container.appendChild(div);
     }
@@ -4177,7 +4299,7 @@ function updateTeamsTabNameFields() {
         div.innerHTML = `
             <span class="text-xs text-gray-500 w-6">${i}.</span>
             <input type="text" id="teams-name-${i}" placeholder="Team ${i}" value="${escapeHtml(prefill)}"
-                   class="flex-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm focus:border-amber-500 focus:outline-none">
+                   class="flex-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm focus:border-amber-500">
         `;
         container.appendChild(div);
     }
@@ -4483,6 +4605,56 @@ function updateOnTheClockDisplay() {
     const progress = Math.min((draftCurrentPick / totalPicks) * 100, 100);
     if (xpFill) xpFill.style.width = `${progress}%`;
     if (xpText) xpText.textContent = `PICK ${draftCurrentPick} OF ${totalPicks}`;
+
+    renderPickTimeline();
+}
+
+function renderPickTimeline() {
+    const container = document.getElementById('pick-timeline');
+    if (!container || !draftSessionId) return;
+
+    const LOOKBEHIND = 3;
+    const LOOKAHEAD = 22;
+    const totalPicks = draftNumTeams * 23;
+
+    const startPick = Math.max(1, draftCurrentPick - LOOKBEHIND);
+    const endPick = Math.min(totalPicks, draftCurrentPick + LOOKAHEAD);
+
+    let html = '<div class="pick-timeline-inner">';
+    let lastRound = null;
+
+    for (let pick = startPick; pick <= endPick; pick++) {
+        const round = Math.floor((pick - 1) / draftNumTeams) + 1;
+        const pickInRound = ((pick - 1) % draftNumTeams) + 1;
+        // Snake draft logic (mirrors calculateNextUserPick / backend get_team_on_clock)
+        const teamPos = (round % 2 === 0)
+            ? (draftNumTeams - pickInRound + 1)
+            : pickInRound;
+        const isUserPick = teamPos === draftUserPosition;
+        const isCurrent = pick === draftCurrentPick;
+        const isPast = pick < draftCurrentPick;
+
+        if (round !== lastRound) {
+            html += `<span class="pick-round-sep">R${round}</span>`;
+            lastRound = round;
+        }
+
+        let cls = 'pick-chip';
+        if (isCurrent) cls += ' pick-chip-current';
+        else if (isUserPick) cls += ' pick-chip-user';
+        else if (isPast) cls += ' pick-chip-past';
+
+        const tooltip = `Pick ${pick} \u00b7 Rd ${round} \u00b7 ${isUserPick ? 'YOUR PICK' : 'Team ' + teamPos}`;
+        const label = isUserPick && !isCurrent ? 'YOU' : String(teamPos);
+        html += `<div class="${cls}" title="${tooltip}">${label}</div>`;
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+
+    // Smooth-scroll current pick into view
+    const current = container.querySelector('.pick-chip-current');
+    if (current) current.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
 }
 
 // Update undo/redo button states
@@ -5370,9 +5542,16 @@ function updateCompareTray() {
         const slotEl = document.getElementById(`compare-slot-${i}`);
         if (compareSlots[i] !== null) {
             const player = players.find(p => p.id === compareSlots[i]);
-            const name = player ? player.name.split(' ').pop() : `#${compareSlots[i]}`;
+            let label;
+            if (player) {
+                const pos = player.primary_position || '';
+                const rank = player.consensus_rank ? `#${player.consensus_rank}` : '';
+                label = `${player.name.split(' ').pop()} ${pos} ${rank}`.trim();
+            } else {
+                label = `#${compareSlots[i]}`;
+            }
             slotEl.className = 'compare-slot-filled';
-            slotEl.innerHTML = `${escapeHtml(name)} <span onclick="removeFromCompare(${i}, event)" class="ml-1 cursor-pointer text-gray-500 hover:text-red-400">&times;</span>`;
+            slotEl.innerHTML = `${escapeHtml(label)} <span onclick="removeFromCompare(${i}, event)" class="ml-1 cursor-pointer text-gray-500 hover:text-red-400">&times;</span>`;
         } else {
             slotEl.className = 'compare-slot-empty';
             slotEl.innerHTML = 'Empty';
@@ -5487,9 +5666,40 @@ function renderComparisonModal(a, b) {
         return vals.reduce((a, b) => a + b, 0) / vals.length;
     }
 
+    // Ranking helpers
+    function bestRank(player) {
+        const ranks = player.rankings || [];
+        const vals = ranks.map(r => r.best_rank).filter(v => v != null);
+        return vals.length ? Math.min(...vals) : null;
+    }
+    function worstRank(player) {
+        const ranks = player.rankings || [];
+        const vals = ranks.map(r => r.worst_rank).filter(v => v != null);
+        return vals.length ? Math.max(...vals) : null;
+    }
+    function avgADP(player) {
+        const ranks = player.rankings || [];
+        const vals = ranks.map(r => r.adp).filter(v => v != null);
+        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    }
+
     // Determine if batter or pitcher
     const aIsPitcher = (a.primary_position === 'SP' || a.primary_position === 'RP');
     const bIsPitcher = (b.primary_position === 'SP' || b.primary_position === 'RP');
+
+    // Mixed-position helpers — pass null for a player's column if they aren't that type
+    function pitchRow(label, field, opts = {}) {
+        return statRow(label,
+            aIsPitcher ? avgProj(a, field) : null,
+            bIsPitcher ? avgProj(b, field) : null,
+            opts);
+    }
+    function batRow(label, field, opts = {}) {
+        return statRow(label,
+            !aIsPitcher ? avgProj(a, field) : null,
+            !bIsPitcher ? avgProj(b, field) : null,
+            opts);
+    }
 
     // Surplus values
     const surpA = surplusValues[a.id];
@@ -5503,33 +5713,54 @@ function renderComparisonModal(a, b) {
     const scarcA = a.scarcity_context;
     const scarcB = b.scarcity_context;
 
-    // Count winners for verdict
+    // Count winners for verdict with category labels
     let winsA = 0, winsB = 0;
-    function tally(vA, vB, lowerBetter = false) {
+    const wonByA = [], wonByB = [];
+    function tally(vA, vB, lowerBetter = false, label = null) {
         if (vA == null || vB == null) return;
         if (vA === vB) return;
         const aW = lowerBetter ? vA < vB : vA > vB;
-        if (aW) winsA++; else winsB++;
+        if (aW) { winsA++; if (label) wonByA.push(label); }
+        else    { winsB++; if (label) wonByB.push(label); }
     }
 
-    // Tally rankings (lower rank = better)
-    tally(a.consensus_rank, b.consensus_rank, true);
-    tally(a.risk_score, b.risk_score, true);
-    if (surpA && surpB) tally(surpA.surplus_value, surpB.surplus_value);
+    // Tally rankings (lower = better)
+    tally(a.consensus_rank, b.consensus_rank, true, 'Rank');
+    tally(avgADP(a), avgADP(b), true, 'ADP');
+    tally(a.risk_score, b.risk_score, true, 'Risk');
+    tally(a.rank_std_dev, b.rank_std_dev, true, 'Consensus');
+    if (surpA && surpB) tally(surpA.surplus_value, surpB.surplus_value, false, 'Surplus');
 
-    // Projected stats tally
-    const projFields = aIsPitcher && bIsPitcher
-        ? [['ip',false],['wins',false],['strikeouts',false],['saves',false],['era',true],['whip',true],['quality_starts',false]]
-        : [['pa',false],['runs',false],['hr',false],['rbi',false],['sb',false],['avg',false],['ops',false]];
-    projFields.forEach(([f, lb]) => {
-        tally(avgProj(a, f), avgProj(b, f), lb);
-    });
+    // Projected stats tally — positional
+    if (aIsPitcher || bIsPitcher) {
+        [['ip',false,'IP'],['wins',false,'W'],['strikeouts',false,'K'],['saves',false,'SV'],
+         ['era',true,'ERA'],['whip',true,'WHIP'],['quality_starts',false,'QS']].forEach(([f, lb, lbl]) => {
+            tally(aIsPitcher ? avgProj(a, f) : null, bIsPitcher ? avgProj(b, f) : null, lb, lbl);
+        });
+    }
+    if (!aIsPitcher || !bIsPitcher) {
+        [['pa',false,'PA'],['runs',false,'R'],['hr',false,'HR'],['rbi',false,'RBI'],
+         ['sb',false,'SB'],['avg',false,'AVG'],['ops',false,'OPS']].forEach(([f, lb, lbl]) => {
+            tally(!aIsPitcher ? avgProj(a, f) : null, !bIsPitcher ? avgProj(b, f) : null, lb, lbl);
+        });
+    }
 
     const verdictText = winsA === winsB
         ? 'Dead even across compared categories'
         : winsA > winsB
             ? `${a.name} leads in ${winsA} categories, ${b.name} in ${winsB}`
             : `${b.name} leads in ${winsB} categories, ${a.name} in ${winsA}`;
+
+    // Injury badge helper
+    function injuryBadge(player) {
+        if (!player.is_injured) return '';
+        const status = player.injury_status || 'Injured';
+        return `<span class="compare-injury-badge">&#x2695; ${escapeHtml(status)}</span>`;
+    }
+
+    // Rank range strings (informational — no winner highlighting)
+    const rankRangeA = (bestRank(a) != null && worstRank(a) != null) ? `#${bestRank(a)} \u2014 #${worstRank(a)}` : '--';
+    const rankRangeB = (bestRank(b) != null && worstRank(b) != null) ? `#${bestRank(b)} \u2014 #${worstRank(b)}` : '--';
 
     // Build sections HTML
     let html = `
@@ -5543,13 +5774,15 @@ function renderComparisonModal(a, b) {
         <!-- Player Headers -->
         <div class="compare-stat-row" style="border-bottom: 2px solid rgba(6,182,212,0.3); padding-bottom: 12px; margin-bottom: 12px;">
             <div class="compare-stat-cell">
-                <div class="text-lg font-bold text-white">${escapeHtml(a.name)}</div>
-                <div class="text-xs text-gray-400">${a.team || 'FA'} | ${a.positions || '--'} | Age ${a.age || '--'}</div>
+                <div class="text-lg font-bold" style="color: var(--text-primary)">${escapeHtml(a.name)}</div>
+                <div class="text-xs" style="color: var(--text-muted)">${a.team || 'FA'} | ${a.positions || '--'} | Age ${a.age || '--'}</div>
+                ${injuryBadge(a)}
             </div>
-            <div class="compare-stat-label text-cyan-400 font-bold">VS</div>
+            <div class="compare-stat-label font-bold" style="color: var(--neon-amber)">VS</div>
             <div class="compare-stat-cell">
-                <div class="text-lg font-bold text-white">${escapeHtml(b.name)}</div>
-                <div class="text-xs text-gray-400">${b.team || 'FA'} | ${b.positions || '--'} | Age ${b.age || '--'}</div>
+                <div class="text-lg font-bold" style="color: var(--text-primary)">${escapeHtml(b.name)}</div>
+                <div class="text-xs" style="color: var(--text-muted)">${b.team || 'FA'} | ${b.positions || '--'} | Age ${b.age || '--'}</div>
+                ${injuryBadge(b)}
             </div>
         </div>
 
@@ -5557,7 +5790,14 @@ function renderComparisonModal(a, b) {
         <div class="mb-4">
             <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Rankings</h3>
             ${statRow('Consensus Rank', a.consensus_rank, b.consensus_rank, {lowerBetter: true, fmt: v => v != null ? '#'+v : '--'})}
+            ${statRow('ADP', avgADP(a), avgADP(b), {lowerBetter: true, fmt: v => v != null ? '#'+Math.round(v) : '--'})}
             ${statRow('Risk Score', a.risk_score, b.risk_score, {lowerBetter: true, fmt: v => fmtNum(v, 0)})}
+            ${statRow('Expert Spread', a.rank_std_dev, b.rank_std_dev, {lowerBetter: true, fmt: v => v != null ? '\xb1'+Math.round(v) : '--'})}
+            <div class="compare-stat-row">
+                <div class="compare-stat-cell">${rankRangeA}</div>
+                <div class="compare-stat-label">Rank Range</div>
+                <div class="compare-stat-cell">${rankRangeB}</div>
+            </div>
         </div>
 
         <!-- Surplus Value -->
@@ -5572,31 +5812,41 @@ function renderComparisonModal(a, b) {
         <div class="mb-4">
             <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Projected Stats (Avg)</h3>`;
 
-    if (aIsPitcher && bIsPitcher) {
-        html += statRow('IP', avgProj(a,'ip'), avgProj(b,'ip'), {fmt: v => fmtNum(v,0)});
-        html += statRow('W', avgProj(a,'wins'), avgProj(b,'wins'), {fmt: v => fmtNum(v,0)});
-        html += statRow('K', avgProj(a,'strikeouts'), avgProj(b,'strikeouts'), {fmt: v => fmtNum(v,0)});
-        html += statRow('SV', avgProj(a,'saves'), avgProj(b,'saves'), {fmt: v => fmtNum(v,0)});
-        html += statRow('ERA', avgProj(a,'era'), avgProj(b,'era'), {lowerBetter: true, fmt: v => fmtNum(v,2)});
-        html += statRow('WHIP', avgProj(a,'whip'), avgProj(b,'whip'), {lowerBetter: true, fmt: v => fmtNum(v,2)});
-        html += statRow('QS', avgProj(a,'quality_starts'), avgProj(b,'quality_starts'), {fmt: v => fmtNum(v,0)});
-    } else {
-        html += statRow('PA', avgProj(a,'pa'), avgProj(b,'pa'), {fmt: v => fmtNum(v,0)});
-        html += statRow('R', avgProj(a,'runs'), avgProj(b,'runs'), {fmt: v => fmtNum(v,0)});
-        html += statRow('HR', avgProj(a,'hr'), avgProj(b,'hr'), {fmt: v => fmtNum(v,0)});
-        html += statRow('RBI', avgProj(a,'rbi'), avgProj(b,'rbi'), {fmt: v => fmtNum(v,0)});
-        html += statRow('SB', avgProj(a,'sb'), avgProj(b,'sb'), {fmt: v => fmtNum(v,0)});
-        html += statRow('AVG', avgProj(a,'avg'), avgProj(b,'avg'), {fmt: v => fmtRate(v)});
-        html += statRow('OPS', avgProj(a,'ops'), avgProj(b,'ops'), {fmt: v => fmtRate(v)});
+    if (aIsPitcher || bIsPitcher) {
+        html += `<div class="text-xs uppercase tracking-wider mb-1 text-center" style="color: var(--text-muted)">Pitching</div>`;
+        html += pitchRow('IP', 'ip', {fmt: v => fmtNum(v, 0)});
+        html += pitchRow('W', 'wins', {fmt: v => fmtNum(v, 0)});
+        html += pitchRow('K', 'strikeouts', {fmt: v => fmtNum(v, 0)});
+        html += pitchRow('SV', 'saves', {fmt: v => fmtNum(v, 0)});
+        html += pitchRow('ERA', 'era', {lowerBetter: true, fmt: v => fmtNum(v, 2)});
+        html += pitchRow('WHIP', 'whip', {lowerBetter: true, fmt: v => fmtNum(v, 2)});
+        html += pitchRow('QS', 'quality_starts', {fmt: v => fmtNum(v, 0)});
+    }
+    if (!aIsPitcher || !bIsPitcher) {
+        html += `<div class="text-xs uppercase tracking-wider mb-1 text-center" style="color: var(--text-muted)">Batting</div>`;
+        html += batRow('PA', 'pa', {fmt: v => fmtNum(v, 0)});
+        html += batRow('R', 'runs', {fmt: v => fmtNum(v, 0)});
+        html += batRow('HR', 'hr', {fmt: v => fmtNum(v, 0)});
+        html += batRow('RBI', 'rbi', {fmt: v => fmtNum(v, 0)});
+        html += batRow('SB', 'sb', {fmt: v => fmtNum(v, 0)});
+        html += batRow('AVG', 'avg', {fmt: v => fmtRate(v)});
+        html += batRow('OPS', 'ops', {fmt: v => fmtRate(v)});
     }
 
     html += `</div>`;
 
     // Position Scarcity
+    const alertA = scarcA?.tier_alert ? `\u26a0 ${scarcA.tier_alert}` : '';
+    const alertB = scarcB?.tier_alert ? `\u26a0 ${scarcB.tier_alert}` : '';
     html += `<div class="mb-4">
         <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Position Scarcity</h3>
         ${statRow('Scarcity', scarcA?.scarcity_multiplier, scarcB?.scarcity_multiplier, {fmt: v => v != null ? v.toFixed(2) + 'x' : '--'})}
-        ${statRow('Tier', scarcA?.tier, scarcB?.tier, {fmt: v => v || '--'})}
+        ${statRow('Elite Left', scarcA?.quality_remaining, scarcB?.quality_remaining, {lowerBetter: true, fmt: v => v != null ? v : '--'})}
+        ${(alertA || alertB) ? `<div class="compare-stat-row" style="border-bottom:none">
+            <div class="compare-stat-cell text-xs" style="color: rgba(255,100,100,0.7)">${escapeHtml(alertA)}</div>
+            <div class="compare-stat-label"></div>
+            <div class="compare-stat-cell text-xs" style="color: rgba(255,100,100,0.7)">${escapeHtml(alertB)}</div>
+        </div>` : ''}
     </div>`;
 
     // Value Classification
@@ -5608,6 +5858,8 @@ function renderComparisonModal(a, b) {
     // Verdict
     const verdictColorA = winsA > winsB ? 'text-emerald-400' : winsA < winsB ? 'text-gray-500' : 'text-yellow-400';
     const verdictColorB = winsB > winsA ? 'text-emerald-400' : winsB < winsA ? 'text-gray-500' : 'text-yellow-400';
+    const breakdownA = wonByA.length ? wonByA.join(', ') : '\u2014';
+    const breakdownB = wonByB.length ? wonByB.join(', ') : '\u2014';
 
     html += `
         <!-- Verdict -->
@@ -5618,6 +5870,11 @@ function renderComparisonModal(a, b) {
                 <div class="compare-stat-cell ${verdictColorB} text-2xl font-bold">${winsB}</div>
             </div>
             <p class="text-center text-sm text-gray-400 mt-2">${verdictText}</p>
+            <div class="text-xs mt-2 text-center">
+                <span style="color: var(--neon-green)">${escapeHtml(a.name.split(' ').pop())}: ${escapeHtml(breakdownA)}</span>
+                <span class="mx-2" style="color: var(--text-muted)">|</span>
+                <span style="color: var(--neon-green)">${escapeHtml(b.name.split(' ').pop())}: ${escapeHtml(breakdownB)}</span>
+            </div>
         </div>
     </div>`;
 

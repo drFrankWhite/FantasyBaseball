@@ -752,22 +752,23 @@ class RecommendationEngine:
             ValueClassification with classification, ADP, ECR, difference, and description
         """
         # Find ADP (community draft position) and ECR (expert consensus rank)
-        adp = None
+        adp_values = []
         ecr = None
 
         for ranking in player.rankings:
-            # Prefer dedicated ADP sources for community draft position
-            if ranking.adp is not None and adp is None:
-                adp = ranking.adp
-            # Use FantasyPros avg_rank as expert consensus rank (same scale as ADP)
-            # Match "FantasyPros" exactly — not "FantasyPros ECR" (ESPN-scale) or "FantasyPros ADP"
+            # Collect all ADP sources to average (matches frontend methodology)
+            if ranking.adp is not None:
+                adp_values.append(ranking.adp)
+            # Use FantasyPros ECR avg_rank as expert consensus rank (same scale as ADP)
             if (
                 ranking.avg_rank is not None
                 and ecr is None
                 and ranking.source
-                and ranking.source.name == "FantasyPros"
+                and ranking.source.name == "FantasyPros ECR"
             ):
                 ecr = ranking.avg_rank
+
+        adp = (sum(adp_values) / len(adp_values)) if adp_values else None
 
         # If we don't have both values, can't classify
         if adp is None or ecr is None:
@@ -1257,8 +1258,10 @@ class RecommendationEngine:
                 vorp_score * 0.20
             )
 
-            # Apply scarcity multiplier
-            composite = base_composite * scarcity_multiplier
+            # Apply scarcity bonus additively so positional value can't override player quality.
+            # (multiplier - 1.0) * 20 maps SS baseline 1.25 → +5 pts, C under pressure 1.50 → +10,
+            # neutral 1.00 → 0, OF 0.90 → -2, RP 0.75 → -5.
+            composite = base_composite + (scarcity_multiplier - 1.0) * 20
 
             scored_players.append({
                 'player': player,
@@ -1511,7 +1514,7 @@ class RecommendationEngine:
     def get_prospect_picks(
         self,
         players: List[Player],
-        limit: int = 10,
+        limit: int = 25,
     ) -> List[ProspectPickResponse]:
         """
         Get top prospects for keeper league value.
@@ -1879,7 +1882,7 @@ class RecommendationEngine:
     def get_enhanced_prospect_picks(
         self,
         players: List[Player],
-        limit: int = 10,
+        limit: int = 25,
     ) -> List[ProspectPickResponse]:
         """
         Get top prospects with enhanced evaluation data including

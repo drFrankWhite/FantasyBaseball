@@ -209,7 +209,7 @@ async def get_recommendations(
     )
     prospects_result = await db.execute(prospects_query)
     prospect_players = prospects_result.scalars().all()
-    prospect_picks = rec_engine.get_prospect_picks(prospect_players, limit=10)
+    prospect_picks = rec_engine.get_prospect_picks(prospect_players, limit=25)
 
     # Calculate current pick info
     from app.models import DraftPick
