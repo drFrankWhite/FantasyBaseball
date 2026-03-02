@@ -23,6 +23,7 @@ let valueClassifications = {};  // Sleeper/bust classifications by player ID
 let surplusValues = {};         // VORP surplus values by player ID
 let currentLeagueId = null;
 let currentUserKey = null;
+let currentClaimedTeamId = null;
 let selectedPositions = new Set();
 let currentTeam = '';
 let searchQuery = '';
@@ -112,9 +113,6 @@ let teamPickerPlayerId = null;  // Player being drafted when team picker is open
 // Track collapsed sections (default all expanded)
 let collapsedSections = new Set();
 
-// Track player recommendation categories for highlighting
-let playerCategories = {}; // player_id -> 'recommended' | 'safe' | 'risky' | 'needs'
-
 // Keeper State
 let keepers = [];
 let keeperTeamNames = [];
@@ -174,15 +172,18 @@ function setClaimedTeamBadge(teamName) {
 
 async function refreshClaimedTeamBadge() {
     if (!currentLeagueId) {
+        currentClaimedTeamId = null;
         setClaimedTeamBadge(null);
         return;
     }
     try {
         const teams = await fetchAPI(withUserKey(`/leagues/${currentLeagueId}/teams`));
         const mine = (teams || []).find(team => team.claimed_by_me);
+        currentClaimedTeamId = mine?.id || null;
         setClaimedTeamBadge(mine?.name || null);
     } catch (error) {
         console.warn('Failed to refresh claimed team badge:', error?.message || error);
+        currentClaimedTeamId = null;
         setClaimedTeamBadge(null);
     }
 }
@@ -553,19 +554,6 @@ function renderSurplusValue(playerId) {
     return `<span class="${color}" title="VORP surplus at ${data.position_used}">${prefix}${surplus.toFixed(1)}</span>`;
 }
 
-// Get highlight class for player based on recommendation category
-function getPlayerHighlightClass(playerId) {
-    const category = playerCategories[playerId];
-    switch (category) {
-        case 'recommended': return 'highlight-recommended';
-        case 'safe': return 'highlight-safe';
-        case 'risky': return 'highlight-risky';
-        case 'needs': return 'highlight-needs';
-        case 'prospect': return 'highlight-prospect';
-        default: return '';
-    }
-}
-
 function handleSort(column) {
     if (sortColumn === column) {
         if (sortDirection === 'asc') {
@@ -668,7 +656,6 @@ function renderPlayerList() {
     }
 
     tbody.innerHTML = filteredPlayers.map((player, index) => {
-        const highlightClass = getPlayerHighlightClass(player.id);
         const injuryBadge = player.is_injured
             ? `<span class="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400 border border-red-500/30">${player.injury_status || 'INJ'}</span>`
             : '';
@@ -678,7 +665,7 @@ function renderPlayerList() {
             : '';
 
         return `
-        <tr class="player-row border-b border-gray-800/50 ${player.is_drafted ? 'drafted' : ''} ${highlightClass} ${index < 30 ? 'animate-fade-in' : ''} cursor-pointer" data-player-id="${player.id}" onclick="showPlayerDetail(${player.id})" style="animation-delay: ${index < 30 ? index * 8 : 0}ms">
+        <tr class="player-row border-b border-gray-800/50 ${player.is_drafted ? 'drafted' : ''} ${index < 30 ? 'animate-fade-in' : ''} cursor-pointer" data-player-id="${player.id}" onclick="showPlayerDetail(${player.id})" style="animation-delay: ${index < 30 ? index * 8 : 0}ms">
             <td class="py-3 px-3">
                 <span class="font-mono text-lg font-bold text-gray-300">${player.consensus_rank || '--'}</span>
             </td>
@@ -715,8 +702,9 @@ function renderPlayerList() {
                     ? '<span class="action-btn drafted-label">Drafted</span>'
                     : (() => {
                         const isMyTurn = draftSessionId && draftIsUserPick;
-                        const btnLabel = draftSessionId ? (isMyTurn ? 'DRAFT' : 'ADD') : 'Draft';
-                        const btnClass = isMyTurn ? 'action-btn draft my-pick' : 'action-btn draft';
+                        const manualMode = draftSessionId && !draftModeActive;
+                        const btnLabel = manualMode ? 'Draft' : (draftSessionId ? (isMyTurn ? 'DRAFT' : 'ADD') : 'Draft');
+                        const btnClass = isMyTurn && !manualMode ? 'action-btn draft my-pick' : 'action-btn draft';
                         return `<button onclick="draftPlayer(${player.id})" class="${btnClass}">${btnLabel}</button>
                     <button onclick="toggleCompare(${player.id}, event)" class="action-btn compare${compareSlots.includes(player.id) ? ' active' : ''}" title="Compare">
                         ${compareSlots.includes(player.id) ? 'CMP' : 'vs'}
@@ -1304,44 +1292,7 @@ function renderScarcityDashboard() {
 
 // Render recommendations
 function renderRecommendations() {
-    // Build player category map for highlighting in the draft board
-    playerCategories = {};
-
-    // Mark recommended players (highest priority)
-    (recommendations.recommended || []).forEach(pick => {
-        playerCategories[pick.player.id] = 'recommended';
-    });
-
-    // Mark safe players (if not already recommended)
-    (recommendations.safe || []).forEach(pick => {
-        if (!playerCategories[pick.player.id]) {
-            playerCategories[pick.player.id] = 'safe';
-        }
-    });
-
-    // Mark risky players (if not already categorized)
-    (recommendations.risky || []).forEach(pick => {
-        if (!playerCategories[pick.player.id]) {
-            playerCategories[pick.player.id] = 'risky';
-        }
-    });
-
-    // Mark needs-based players (if not already categorized)
-    (recommendations.category_needs || []).forEach(pick => {
-        if (!playerCategories[pick.player.id]) {
-            playerCategories[pick.player.id] = 'needs';
-        }
-    });
-
-    // Mark prospects (pink highlight - can coexist with other categories)
-    (recommendations.prospects || []).forEach(pick => {
-        // Prospects get their own highlight if not already categorized
-        if (!playerCategories[pick.player.id]) {
-            playerCategories[pick.player.id] = 'prospect';
-        }
-    });
-
-    // Re-render player list with highlights
+    // Re-render player list
     renderPlayerList();
 
     // ── DECISION FUNNEL RENDERING ────────────────────────────────────────
@@ -1401,7 +1352,11 @@ function renderRecommendations() {
         const raw = (player.primary_position ||
                      (player.positions || '').split(/[\/,]/)[0].trim()).toUpperCase();
         if (['LF','CF','RF','DH'].includes(raw)) return 'OF';
-        if (raw === 'P') return 'SP';
+        if (raw === 'P' || raw === 'SP') {
+            // If the full positions string contains RP but not SP, it's a reliever
+            const allPos = (player.positions || '').toUpperCase();
+            return (allPos.includes('RP') && !allPos.includes('SP')) ? 'RP' : 'SP';
+        }
         return raw;
     }
 
@@ -1410,51 +1365,99 @@ function renderRecommendations() {
     const bestByPos = {};
 
     const pools = [
-        ...(recommendations.recommended || []).map(p => ({pick: p, type: 'recommended'})),
-        ...(recommendations.safe        || []).map(p => ({pick: p, type: 'safe'})),
-        ...(recommendations.risky       || []).map(p => ({pick: p, type: 'risky'})),
+        ...(recommendations.recommended    || []).map(p => ({pick: p, type: 'recommended'})),
+        ...(recommendations.safe           || []).map(p => ({pick: p, type: 'safe'})),
+        ...(recommendations.risky          || []).map(p => ({pick: p, type: 'risky'})),
         ...(recommendations.category_needs || []).map(p => ({pick: p, type: 'needs'})),
+        ...(recommendations.prospects      || []).map(p => ({pick: p, type: 'prospect'})),
     ];
 
     for (const {pick, type} of pools) {
         if (pick.player.id === heroId) continue;
         const pos = getCanonicalPosition(pick.player);
-        if (POSITIONS.includes(pos) && !bestByPos[pos]) {
+        if (!POSITIONS.includes(pos)) continue;
+        const composite = pick.composite ?? 0;
+        if (!bestByPos[pos] || composite > (bestByPos[pos].pick.composite ?? 0)) {
             bestByPos[pos] = {pick, type};
         }
     }
 
-    const typeColors = {
-        recommended: 'var(--neon-amber)',
-        safe:        'var(--neon-green)',
-        risky:       'var(--neon-orange)',
-        needs:       'var(--neon-blue)',
+    const TYPE_LABELS = {
+        recommended: 'TOP', safe: 'SAFE', risky: 'RISKY', needs: 'NEED', prospect: 'PROS',
     };
 
-    const alsoHtml = POSITIONS.map(pos => {
+    const FIELD_LAYOUT = {
+        'C':  { left: 50, top: 87 },
+        'SP': { left: 50, top: 60 },
+        '1B': { left: 74, top: 70 },
+        '2B': { left: 63, top: 46 },
+        '3B': { left: 26, top: 70 },
+        'SS': { left: 37, top: 53 },
+        'OF': { left: 50, top: 18 },
+        'RP': { left: 82, top: 84 },
+    };
+
+    const fieldHtml = POSITIONS.map(pos => {
+        const layout = FIELD_LAYOUT[pos];
+        if (!layout) return '';
+        const entry = bestByPos[pos];
+        const posStyle = `left:${layout.left}%;top:${layout.top}%`;
+
+        let chipHtml = '';
+        if (entry) {
+            const {pick, type} = entry;
+            const p = pick.player;
+            const rank = p.consensus_rank ? `#${p.consensus_rank}` : '—';
+            const team = p.team || 'FA';
+            const typeLabel = TYPE_LABELS[type] || type.toUpperCase();
+            const rationale = (pick.summary || pick.rationale || pick.upside || pick.need_addressed || '').slice(0, 78);
+
+            chipHtml = `
+                <button class="fenway-player-chip type-${type}" onclick="showPlayerDetail(${p.id})" title="${escapeHtml(rationale || p.name)}">
+                    <span class="fenway-chip-name">${escapeHtml(p.name)}</span>
+                    <span class="fenway-chip-meta">${rank} · ${escapeHtml(team)}</span>
+                    <span class="fenway-chip-type">${typeLabel}</span>
+                </button>
+            `;
+        }
+
+        return `<div class="fenway-slot${entry ? ' has-player' : ' empty'}" style="${posStyle}">
+            <span class="fenway-marker">${pos}</span>
+            ${chipHtml}
+        </div>`;
+    }).join('');
+
+    const mobileRows = POSITIONS.map(pos => {
         const entry = bestByPos[pos];
         if (!entry) {
-            return `<div class="pos-chip pos-chip-empty">
-                <span class="pos-chip-label">${pos}</span>
-                <span class="pos-chip-name">—</span>
+            return `<div class="fenway-mobile-row empty">
+                <span class="fenway-mobile-pos">${pos}</span>
+                <span class="fenway-mobile-empty">No recommendation</span>
             </div>`;
         }
         const {pick, type} = entry;
         const p = pick.player;
         const rank = p.consensus_rank ? `#${p.consensus_rank}` : '—';
-        const color = typeColors[type] || 'var(--text-secondary)';
-        const detail = pick.summary || pick.rationale || '';
-        const shortName = p.name.split(' ').slice(-1)[0];
-        return `<div class="pos-chip" title="${p.name} · ${rank} · ${detail}"
-                     onclick="showPlayerDetail(${p.id})" style="cursor:pointer">
-            <span class="pos-chip-label">${pos}</span>
-            <span class="pos-chip-name" style="color:${color}">${shortName}</span>
-            <span class="pos-chip-rank">${rank}</span>
-        </div>`;
+        const typeLabel = TYPE_LABELS[type] || type.toUpperCase();
+        return `<button class="fenway-mobile-row has-player type-${type}" onclick="showPlayerDetail(${p.id})">
+            <span class="fenway-mobile-pos">${pos}</span>
+            <span class="fenway-mobile-name">${escapeHtml(p.name)}</span>
+            <span class="fenway-mobile-meta">${rank}</span>
+            <span class="fenway-mobile-type">${typeLabel}</span>
+        </button>`;
     }).join('');
 
-    document.getElementById('also-consider-picks').innerHTML =
-        `<div class="pos-grid">${alsoHtml}</div>`;
+    document.getElementById('also-consider-picks').innerHTML = `
+        <div class="fenway-also-consider">
+            <div class="fenway-field" aria-label="Fenway-inspired also-consider field">
+                <div class="fenway-green-monster" aria-hidden="true"></div>
+                ${fieldHtml}
+            </div>
+            <div class="fenway-mobile-list">
+                ${mobileRows}
+            </div>
+        </div>
+    `;
 
 }
 
@@ -2073,14 +2076,39 @@ async function importNotes(file) {
 
 // Draft player - assigns to team on the clock automatically
 async function draftPlayer(playerId) {
+    // Manual mode with an active session: default Draft button always drafts to claimed team.
+    if (draftSessionId && !draftModeActive) {
+        if (!currentClaimedTeamId) {
+            showNotification('Claim your team in the League tab before drafting.', 'error');
+            return;
+        }
+        await markDrafted(playerId, true, currentClaimedTeamId);
+        return;
+    }
+
+    // Quick-draft mode: always draft to the claimed team
+    if (!draftSessionId) {
+        if (!currentClaimedTeamId) {
+            showNotification('Claim your team in the League tab before drafting.', 'error');
+            return;
+        }
+        await markDrafted(playerId, true, currentClaimedTeamId);
+        return;
+    }
+
     // Determine if it's the user's pick or another team's pick
-    const isMyPick = draftSessionId ? draftIsUserPick : false;
-    const teamPosition = draftSessionId ? draftTeamOnClock : null;
+    const isMyPick = draftIsUserPick;
+    const teamPosition = draftTeamOnClock;
+
+    if (isMyPick && !currentClaimedTeamId) {
+        showNotification('Claim your team in the League tab before drafting your picks.', 'error');
+        return;
+    }
 
     // Call markDrafted with appropriate parameters
     // - If it's user's pick: my_team=true
     // - If it's another team's pick: assign to team on clock
-    await markDrafted(playerId, isMyPick, isMyPick ? null : teamPosition);
+    await markDrafted(playerId, isMyPick, isMyPick ? currentClaimedTeamId : teamPosition);
 }
 
 // Draft player from modal
@@ -2415,8 +2443,9 @@ async function markDrafted(playerId, myTeam = false, teamDraftPosition = null) {
         // Reload recommendations
         await loadRecommendations(); await loadScarcity();
 
-        // If it's my pick, update My Team tab count
+        // If it's my pick, refresh pinned My Team section + count badge
         if (myTeam) {
+            await loadMyTeam();
             updateMyTeamCount();
         }
 
@@ -2434,9 +2463,9 @@ async function markDrafted(playerId, myTeam = false, teamDraftPosition = null) {
 async function updateMyTeamCount() {
     try {
         const roster = await fetchAPI(withUserKey(`/players/my-team/roster?league_id=${currentLeagueId}`));
-        const tabBtn = document.querySelector('[data-tab="my-team"]');
+        const tabBtn = document.querySelector('[data-tab="recommendations"]');
         if (tabBtn) {
-            tabBtn.textContent = `My Team (${roster.length})`;
+            tabBtn.textContent = `Picks (${roster.length})`;
         }
     } catch (error) {
         console.error('Failed to update team count:', error);
@@ -2547,9 +2576,7 @@ function showTab(tabName) {
     activeBtn.setAttribute('aria-selected', 'true');
 
     // Load tab-specific data
-    if (tabName === 'my-team') {
-        loadMyTeam();
-    } else if (tabName === 'market') {
+    if (tabName === 'market') {
         renderScarcityDashboard();
         renderCategoryPlanner();
     } else if (tabName === 'prospects') {
@@ -2650,90 +2677,160 @@ function renderCategoryBars(data) {
 
 // Load my team
 async function loadMyTeam() {
+    const rosterTargets = ['my-roster-inline']
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
+
+    const renderToTargets = (html) => {
+        rosterTargets.forEach(el => { el.innerHTML = html; });
+    };
+
     try {
         const roster = await fetchAPI(withUserKey(`/players/my-team/roster?league_id=${currentLeagueId}`));
 
         if (roster.length === 0) {
-            document.getElementById('my-roster').innerHTML = `
+            renderToTargets(`
                 <div class="text-center py-8">
                     <div class="text-4xl mb-3 opacity-50">⚾</div>
                     <p class="text-gray-400">No players drafted yet</p>
-                    <p class="text-sm text-gray-500 mt-1">Click "✓ Mine" to add players to your team</p>
+                    <p class="text-sm text-gray-500 mt-1">Claim your team in League, then click Draft to add players</p>
                 </div>
-            `;
+            `);
             return;
         }
+        const sortedRoster = [...roster].sort((a, b) => {
+            const ar = a.consensus_rank ?? 9999;
+            const br = b.consensus_rank ?? 9999;
+            return ar - br;
+        });
 
-        // Group by position
-        const hitters = roster.filter(p => !['SP', 'RP'].includes(p.primary_position));
-        const pitchers = roster.filter(p => ['SP', 'RP'].includes(p.primary_position));
+        const getPosMeta = (player) => {
+            const raw = `${player.positions || ''}/${player.primary_position || ''}`
+                .toUpperCase()
+                .split(/[\/,]/)
+                .map(p => p.trim())
+                .filter(Boolean);
+            const hasDH = raw.includes('DH');
+            const normalized = raw.map(p => {
+                if (['LF', 'CF', 'RF'].includes(p)) return 'OF';
+                if (p === 'P') return 'SP';
+                return p;
+            });
+            return { pos: new Set(normalized), hasDH };
+        };
 
-        document.getElementById('my-roster').innerHTML = `
-            <div class="mb-6">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="roster-section-icon hitter">⚾</span>
-                    <h4 class="font-semibold text-gray-200">Hitters</h4>
-                    <span class="roster-count">${hitters.length}</span>
+        const slotDefs = [
+            { slot: 'C', label: 'C', eligible: m => !m.hasDH && m.pos.has('C') },
+            { slot: '1B', label: '1B', eligible: m => !m.hasDH && m.pos.has('1B') },
+            { slot: '2B', label: '2B', eligible: m => !m.hasDH && m.pos.has('2B') },
+            { slot: '3B', label: '3B', eligible: m => !m.hasDH && m.pos.has('3B') },
+            { slot: 'SS', label: 'SS', eligible: m => !m.hasDH && m.pos.has('SS') },
+            { slot: 'OF1', label: 'OF', eligible: m => !m.hasDH && m.pos.has('OF') },
+            { slot: 'OF2', label: 'OF', eligible: m => !m.hasDH && m.pos.has('OF') },
+            { slot: 'OF3', label: 'OF', eligible: m => !m.hasDH && m.pos.has('OF') },
+            { slot: 'UTIL', label: 'UTIL', eligible: m => m.hasDH || (!m.pos.has('SP') && !m.pos.has('RP')) },
+            { slot: 'SP1', label: 'SP', eligible: m => m.pos.has('SP') },
+            { slot: 'SP2', label: 'SP', eligible: m => m.pos.has('SP') },
+            { slot: 'SP3', label: 'SP', eligible: m => m.pos.has('SP') },
+            { slot: 'SP4', label: 'SP', eligible: m => m.pos.has('SP') },
+            { slot: 'SP5', label: 'SP', eligible: m => m.pos.has('SP') },
+            { slot: 'RP1', label: 'RP', eligible: m => m.pos.has('RP') },
+            { slot: 'RP2', label: 'RP', eligible: m => m.pos.has('RP') },
+            { slot: 'BN1', label: 'BENCH', eligible: _m => true },
+            { slot: 'BN2', label: 'BENCH', eligible: _m => true },
+            { slot: 'BN3', label: 'BENCH', eligible: _m => true },
+            { slot: 'BN4', label: 'BENCH', eligible: _m => true },
+            { slot: 'BN5', label: 'BENCH', eligible: _m => true },
+        ];
+
+        const assignedIds = new Set();
+        const slotRows = slotDefs.map(def => {
+            let chosen = null;
+            for (const p of sortedRoster) {
+                if (assignedIds.has(p.id)) continue;
+                if (def.eligible(getPosMeta(p))) {
+                    chosen = p;
+                    assignedIds.add(p.id);
+                    break;
+                }
+            }
+            return { ...def, player: chosen };
+        });
+
+        const overflow = sortedRoster.filter(p => !assignedIds.has(p.id));
+
+        const rowHtml = slotRows.map((row, i) => {
+            if (!row.player) {
+                return `
+                    <div class="roster-player-card animate-slide-up opacity-60" style="animation-delay: ${i * 25}ms">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs px-2 py-0.5 rounded border border-gray-600 text-gray-400 min-w-[56px] text-center">${row.label}</span>
+                            <span class="text-gray-500 text-sm">Empty slot</span>
+                        </div>
+                    </div>
+                `;
+            }
+            const p = row.player;
+            return `
+                <div class="roster-player-card animate-slide-up" style="animation-delay: ${i * 25}ms">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="text-xs px-2 py-0.5 rounded border border-emerald-700/50 text-emerald-300 min-w-[56px] text-center">${row.label}</span>
+                        <button onclick="showPlayerDetail(${p.id})" class="font-medium hover:text-emerald-400 transition-colors truncate">
+                            ${p.name}
+                        </button>
+                        ${renderPositionBadge(p.positions)}
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-gray-400 text-sm">${p.team || '--'}</span>
+                        <button onclick="undraftPlayer(${p.id})" class="remove-btn" title="Remove from roster">✕</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const overflowHtml = overflow.length > 0 ? `
+            <div class="mt-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <h4 class="font-semibold text-gray-300 text-sm">Additional Drafted (${overflow.length})</h4>
                 </div>
                 <div class="space-y-2">
-                    ${hitters.map((p, i) => `
-                        <div class="roster-player-card animate-slide-up" style="animation-delay: ${i * 50}ms">
-                            <div class="flex items-center gap-3">
-                                <button onclick="showPlayerDetail(${p.id})" class="font-medium hover:text-emerald-400 transition-colors">
+                    ${overflow.map((p, i) => `
+                        <div class="roster-player-card animate-slide-up" style="animation-delay: ${(slotRows.length + i) * 25}ms">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="text-xs px-2 py-0.5 rounded border border-gray-600 text-gray-400 min-w-[56px] text-center">EXTRA</span>
+                                <button onclick="showPlayerDetail(${p.id})" class="font-medium hover:text-emerald-400 transition-colors truncate">
                                     ${p.name}
                                 </button>
                                 ${renderPositionBadge(p.positions)}
                             </div>
                             <div class="flex items-center gap-3">
-                                <span class="text-gray-400 text-sm">${p.team}</span>
-                                <button onclick="undraftPlayer(${p.id})" class="remove-btn" title="Remove from roster">
-                                    ✕
-                                </button>
+                                <span class="text-gray-400 text-sm">${p.team || '--'}</span>
+                                <button onclick="undraftPlayer(${p.id})" class="remove-btn" title="Remove from roster">✕</button>
                             </div>
                         </div>
                     `).join('')}
                 </div>
             </div>
-            <div class="mb-6">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="roster-section-icon pitcher">🎯</span>
-                    <h4 class="font-semibold text-gray-200">Pitchers</h4>
-                    <span class="roster-count">${pitchers.length}</span>
+        ` : '';
+
+        renderToTargets(`
+            <div class="mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="font-semibold text-gray-200">Roster Slots</h4>
+                    <span class="roster-count">${roster.length} drafted</span>
                 </div>
-                <div class="space-y-2">
-                    ${pitchers.map((p, i) => `
-                        <div class="roster-player-card animate-slide-up" style="animation-delay: ${(hitters.length + i) * 50}ms">
-                            <div class="flex items-center gap-3">
-                                <button onclick="showPlayerDetail(${p.id})" class="font-medium hover:text-emerald-400 transition-colors">
-                                    ${p.name}
-                                </button>
-                                ${renderPositionBadge(p.primary_position)}
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <span class="text-gray-400 text-sm">${p.team}</span>
-                                <button onclick="undraftPlayer(${p.id})" class="remove-btn" title="Remove from roster">
-                                    ✕
-                                </button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
+                <div class="space-y-2">${rowHtml}</div>
+                ${overflowHtml}
             </div>
-            <div class="roster-summary">
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-400">Total Roster</span>
-                    <span class="text-lg font-bold text-emerald-400">${roster.length} players</span>
-                </div>
-            </div>
-        `;
+        `);
     } catch (error) {
         console.error('Failed to load roster:', error);
-        document.getElementById('my-roster').innerHTML = `
+        renderToTargets(`
             <div class="text-center py-8">
                 <div class="text-4xl mb-3">⚠️</div>
                 <p class="text-red-400">Failed to load roster</p>
             </div>
-        `;
+        `);
     }
 }
 
@@ -2994,16 +3091,19 @@ async function loadClaimableTeams() {
             selectEl.value = String(myClaim.id);
             statusEl.textContent = `You claimed: ${myClaim.name}`;
             statusEl.className = 'text-xs text-emerald-300 mb-2';
+            currentClaimedTeamId = myClaim.id;
             setClaimedTeamBadge(myClaim.name);
         } else {
             statusEl.textContent = 'No team claimed yet.';
             statusEl.className = 'text-xs text-gray-400 mb-2';
+            currentClaimedTeamId = null;
             setClaimedTeamBadge(null);
         }
     } catch (error) {
         console.error('Failed to load claimable teams:', error);
         statusEl.textContent = 'Unable to load team claims.';
         statusEl.className = 'text-xs text-red-300 mb-2';
+        currentClaimedTeamId = null;
     }
 }
 

@@ -319,38 +319,6 @@ header button.bg-emerald-600 {
     filter: grayscale(0.8);
 }
 
-/* Player row highlight categories - Rarity-based */
-.player-row.highlight-recommended {
-    background: linear-gradient(90deg, rgba(255, 170, 0, 0.2) 0%, transparent 100%);
-    border-left-color: var(--rarity-legendary);
-    animation: legendary-glow 2s ease-in-out infinite;
-}
-
-@keyframes legendary-glow {
-    0%, 100% { box-shadow: inset 0 0 20px rgba(255, 170, 0, 0.2); }
-    50% { box-shadow: inset 0 0 40px rgba(255, 170, 0, 0.4); }
-}
-
-.player-row.highlight-safe {
-    background: linear-gradient(90deg, rgba(245, 200, 66, 0.15) 0%, transparent 100%);
-    border-left-color: var(--neon-green);
-}
-
-.player-row.highlight-risky {
-    background: linear-gradient(90deg, rgba(255, 136, 0, 0.15) 0%, transparent 100%);
-    border-left-color: var(--neon-orange);
-}
-
-.player-row.highlight-needs {
-    background: linear-gradient(90deg, rgba(68, 136, 255, 0.15) 0%, transparent 100%);
-    border-left-color: var(--neon-blue);
-}
-
-.player-row.highlight-prospect {
-    background: linear-gradient(90deg, rgba(170, 68, 255, 0.15) 0%, transparent 100%);
-    border-left-color: var(--neon-purple);
-}
-
 /* Table header */
 thead {
     background: linear-gradient(180deg, rgba(245, 200, 66, 0.08) 0%, transparent 100%), var(--bg-primary);
@@ -1157,63 +1125,222 @@ input[type="text"]::placeholder {
     border: 1px solid rgba(64, 196, 255, 0.3);
 }
 
-/* ========================================
-   Also Consider — Best Available By Position grid
-   ======================================== */
-.pos-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 5px;
+/* ─── Also Consider (Fenway-Inspired) ────────────────────────── */
+.fenway-also-consider {
+    margin-top: 0.35rem;
 }
 
-.pos-chip {
+.fenway-field {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 12 / 7;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(129, 199, 132, 0.22);
+    background:
+        repeating-linear-gradient(
+            -14deg,
+            rgba(90, 140, 80, 0.24) 0 18px,
+            rgba(72, 122, 66, 0.24) 18px 36px
+        ),
+        radial-gradient(ellipse at 50% 97%, #4b3a25 0%, #2f2418 15%, rgba(0,0,0,0) 26%),
+        radial-gradient(ellipse at 50% 90%, #24542e 0%, #1d4726 52%, #123119 100%);
+    box-shadow: inset 0 -30px 80px rgba(0, 0, 0, 0.35);
+}
+
+.fenway-field::before {
+    content: '';
+    position: absolute;
+    width: 32%;
+    aspect-ratio: 1;
+    left: 34%;
+    bottom: 13%;
+    border: 1.5px solid rgba(220, 195, 140, 0.5);
+    transform: rotate(45deg);
+    box-shadow: 0 0 0 1px rgba(62, 49, 29, 0.25);
+    pointer-events: none;
+}
+
+.fenway-field::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 60%;
+    width: 8px;
+    height: 8px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: rgba(208, 182, 132, 0.72);
+    box-shadow: 0 0 8px rgba(208, 182, 132, 0.45);
+    pointer-events: none;
+}
+
+.fenway-green-monster {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4.8%;
+    background: linear-gradient(180deg, rgba(27, 77, 44, 0.85) 0%, rgba(16, 56, 30, 0.92) 100%);
+    border-right: 1px solid rgba(88, 170, 112, 0.45);
+    box-shadow: inset -8px 0 14px rgba(0, 0, 0, 0.3);
+}
+
+.fenway-slot {
+    position: absolute;
+    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
-    padding: 5px 3px 4px;
-    background: var(--bg-card);
-    border: 1px solid rgba(245, 200, 66, 0.12);
-    border-radius: var(--radius-md);
-    transition: border-color var(--transition-fast), background var(--transition-fast);
-    min-width: 0;
+    gap: 0.34rem;
 }
 
-.pos-chip:hover {
-    background: var(--bg-hover);
-    border-color: rgba(245, 200, 66, 0.3);
-}
-
-.pos-chip-empty {
-    opacity: 0.35;
-    cursor: default !important;
-}
-
-.pos-chip-label {
+.fenway-marker {
+    min-width: 30px;
+    padding: 0.1rem 0.4rem;
+    border-radius: 9999px;
+    text-align: center;
     font-family: 'Orbitron', sans-serif;
-    font-size: 0.48rem;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    text-transform: uppercase;
+    font-size: 0.52rem;
+    letter-spacing: 0.45px;
+    color: rgba(226, 236, 225, 0.9);
+    background: rgba(6, 16, 10, 0.64);
+    border: 1px solid rgba(164, 194, 165, 0.34);
+    backdrop-filter: blur(2px);
 }
 
-.pos-chip-name {
-    font-family: 'Chakra Petch', sans-serif;
-    font-size: 0.62rem;
+.fenway-slot.empty .fenway-marker {
+    opacity: 0.45;
+}
+
+.fenway-player-chip {
+    min-width: 92px;
+    max-width: 124px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    background: linear-gradient(180deg, rgba(14, 20, 18, 0.92) 0%, rgba(10, 16, 14, 0.95) 100%) !important;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+    padding: 0.36rem 0.42rem 0.38rem;
+    text-align: left;
+    line-height: 1.1;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.fenway-player-chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.52);
+}
+
+.fenway-chip-name {
+    display: block;
+    color: var(--text-primary);
+    font-size: 0.7rem;
     font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 100%;
-    text-align: center;
 }
 
-.pos-chip-rank {
-    font-size: 0.5rem;
+.fenway-chip-meta {
+    display: block;
+    margin-top: 0.12rem;
+    color: rgba(188, 205, 184, 0.88);
+    font-size: 0.58rem;
     font-weight: 600;
-    color: var(--text-muted);
-    font-family: 'Chakra Petch', sans-serif;
+}
+
+.fenway-chip-type {
+    display: inline-block;
+    margin-top: 0.2rem;
+    padding: 0.08rem 0.34rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+}
+
+.fenway-player-chip.type-recommended { border-color: rgba(255, 214, 0, 0.52) !important; }
+.fenway-player-chip.type-recommended .fenway-chip-type { color: var(--neon-amber); border-color: rgba(255, 214, 0, 0.36); }
+.fenway-player-chip.type-safe { border-color: rgba(105, 240, 174, 0.5) !important; }
+.fenway-player-chip.type-safe .fenway-chip-type { color: var(--neon-green); border-color: rgba(105, 240, 174, 0.34); }
+.fenway-player-chip.type-risky { border-color: rgba(255, 109, 0, 0.5) !important; }
+.fenway-player-chip.type-risky .fenway-chip-type { color: var(--neon-orange); border-color: rgba(255, 109, 0, 0.34); }
+.fenway-player-chip.type-needs { border-color: rgba(64, 196, 255, 0.52) !important; }
+.fenway-player-chip.type-needs .fenway-chip-type { color: var(--neon-blue); border-color: rgba(64, 196, 255, 0.34); }
+.fenway-player-chip.type-prospect { border-color: rgba(224, 64, 251, 0.52) !important; }
+.fenway-player-chip.type-prospect .fenway-chip-type { color: var(--neon-purple); border-color: rgba(224, 64, 251, 0.34); }
+
+.fenway-mobile-list {
+    display: none;
+}
+
+@media (max-width: 980px) {
+    .fenway-field {
+        display: none;
+    }
+
+    .fenway-mobile-list {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.4rem;
+    }
+
+    .fenway-mobile-row {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.4rem 0.55rem;
+        border-radius: 10px;
+        border: 1px solid rgba(129, 199, 132, 0.2);
+        background: rgba(10, 16, 12, 0.72);
+        text-transform: none !important;
+        letter-spacing: 0 !important;
+    }
+
+    .fenway-mobile-row.empty {
+        color: var(--text-muted);
+    }
+
+    .fenway-mobile-pos {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.62rem;
+        color: rgba(201, 222, 196, 0.9);
+    }
+
+    .fenway-mobile-name {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .fenway-mobile-meta {
+        font-size: 0.62rem;
+        color: var(--text-secondary);
+    }
+
+    .fenway-mobile-type {
+        font-size: 0.54rem;
+        font-weight: 700;
+        color: var(--text-muted);
+    }
+
+    .fenway-mobile-row.type-recommended .fenway-mobile-type { color: var(--neon-amber); }
+    .fenway-mobile-row.type-safe .fenway-mobile-type { color: var(--neon-green); }
+    .fenway-mobile-row.type-risky .fenway-mobile-type { color: var(--neon-orange); }
+    .fenway-mobile-row.type-needs .fenway-mobile-type { color: var(--neon-blue); }
+    .fenway-mobile-row.type-prospect .fenway-mobile-type { color: var(--neon-purple); }
+
+    .fenway-mobile-empty {
+        font-size: 0.65rem;
+    }
 }
 
 /* ========================================

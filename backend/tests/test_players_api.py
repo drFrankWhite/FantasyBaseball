@@ -315,6 +315,110 @@ class TestPlayerDetail:
         assert r.status_code == 200
         assert r.json()["status"] == "undrafted"
 
+    def test_my_team_roster_legacy_marker_200(self, client):
+        """Draft with my_team=true should be retrievable via /my-team/roster."""
+        draft_resp = client.post(f"{self.BASE}/{self.JUDGE_ID}/draft", params={"my_team": "true"})
+        assert draft_resp.status_code == 200
+
+        roster_resp = client.get(f"{self.BASE}/my-team/roster")
+        assert roster_resp.status_code == 200
+        names = [p["name"] for p in roster_resp.json()]
+        assert "Aaron Judge" in names
+
+
+class TestMyTeamRosterResolution:
+    """Coverage for /my-team/roster with claim-based and legacy team resolution."""
+
+    BASE_PLAYERS = "/api/v1/players"
+    BASE_LEAGUES = "/api/v1/leagues"
+    TARGET_PLAYER_ID = 7  # Gerrit Cole in seed, starts undrafted
+
+    def test_roster_uses_claimed_team_when_user_key_provided(self, client):
+        # Ensure clean player state
+        client.post(f"{self.BASE_PLAYERS}/{self.TARGET_PLAYER_ID}/undraft")
+
+        # Create league and teams
+        league_resp = client.post(
+            f"{self.BASE_LEAGUES}/",
+            json={"espn_league_id": 990001, "year": 2026, "name": "Claim Test League"},
+        )
+        assert league_resp.status_code == 200
+        league_id = league_resp.json()["id"]
+
+        manual_resp = client.post(
+            f"{self.BASE_LEAGUES}/{league_id}/teams/manual",
+            json={"num_teams": 2, "team_names": ["Alpha", "Beta"]},
+        )
+        assert manual_resp.status_code == 200
+
+        teams_resp = client.get(f"{self.BASE_LEAGUES}/{league_id}/teams")
+        assert teams_resp.status_code == 200
+        teams = teams_resp.json()
+        alpha = next(t for t in teams if t["draft_position"] == 1)
+
+        # Claim Alpha and draft player to that team id
+        claim_resp = client.post(
+            f"{self.BASE_LEAGUES}/{league_id}/claim-team",
+            json={"team_id": alpha["id"], "user_key": "user_claim_test"},
+        )
+        assert claim_resp.status_code == 200
+
+        draft_resp = client.post(
+            f"{self.BASE_PLAYERS}/{self.TARGET_PLAYER_ID}/draft",
+            params={"team_id": alpha["id"]},
+        )
+        assert draft_resp.status_code == 200
+
+        roster_resp = client.get(
+            f"{self.BASE_PLAYERS}/my-team/roster",
+            params={"league_id": league_id, "user_key": "user_claim_test"},
+        )
+        assert roster_resp.status_code == 200
+        ids = [p["id"] for p in roster_resp.json()]
+        assert self.TARGET_PLAYER_ID in ids
+
+    def test_roster_falls_back_to_is_user_team_without_user_key(self, client):
+        # Ensure clean player state
+        client.post(f"{self.BASE_PLAYERS}/{self.TARGET_PLAYER_ID}/undraft")
+
+        # Create league and teams
+        league_resp = client.post(
+            f"{self.BASE_LEAGUES}/",
+            json={"espn_league_id": 990002, "year": 2026, "name": "Legacy User Team League"},
+        )
+        assert league_resp.status_code == 200
+        league_id = league_resp.json()["id"]
+
+        manual_resp = client.post(
+            f"{self.BASE_LEAGUES}/{league_id}/teams/manual",
+            json={"num_teams": 2, "team_names": ["My Legacy Team", "Other"]},
+        )
+        assert manual_resp.status_code == 200
+
+        teams_resp = client.get(f"{self.BASE_LEAGUES}/{league_id}/teams")
+        assert teams_resp.status_code == 200
+        teams = teams_resp.json()
+        my_team = next(t for t in teams if t["draft_position"] == 1)
+
+        set_user_resp = client.post(
+            f"{self.BASE_LEAGUES}/{league_id}/set-user-team/{my_team['id']}"
+        )
+        assert set_user_resp.status_code == 200
+
+        draft_resp = client.post(
+            f"{self.BASE_PLAYERS}/{self.TARGET_PLAYER_ID}/draft",
+            params={"team_id": my_team["id"]},
+        )
+        assert draft_resp.status_code == 200
+
+        roster_resp = client.get(
+            f"{self.BASE_PLAYERS}/my-team/roster",
+            params={"league_id": league_id},
+        )
+        assert roster_resp.status_code == 200
+        ids = [p["id"] for p in roster_resp.json()]
+        assert self.TARGET_PLAYER_ID in ids
+
 
 # ===========================================================================
 # TestPlayerDetailSchemaEdgeCases

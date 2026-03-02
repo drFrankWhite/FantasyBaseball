@@ -66,6 +66,7 @@ class RecommendedPickResponse(BaseModel):
     risk_level: str  # "low", "medium", "high"
     category_impact: CategoryImpact
     sources: List[SourceLink]
+    composite: float = 0.0  # Internal composite score for client-side sorting
 
 
 class ScoutingGrades(BaseModel):

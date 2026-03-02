@@ -195,11 +195,12 @@ class RecommendationEngine:
         position_bonus = settings.position_scarcity_bonus.get(position, 0)
         base_scarcity = 1.0 + (position_bonus * 0.05)  # e.g., +6 -> 1.30, -5 -> 0.75
 
-        # Dynamic scarcity based on remaining supply
-        # Fewer available = higher multiplier
+        # Fade in static scarcity over first 5 rounds — no positional advantage at pick 1
         rounds_completed = total_picks_made // num_teams
+        round_factor = min(1.0, rounds_completed / 5)
+        scaled_base = 1.0 + (base_scarcity - 1.0) * round_factor
 
-        # Expected supply per position (rough)
+        # Dynamic scarcity based on remaining supply
         expected_starters = {
             "C": 15, "1B": 30, "2B": 25, "3B": 25, "SS": 25,
             "OF": 80, "SP": 70, "RP": 40
@@ -210,7 +211,7 @@ class RecommendationEngine:
         supply_ratio = available_at_position / max(expected, 1)
         dynamic_multiplier = 1.0 + (1.0 - min(supply_ratio, 1.0)) * 0.3
 
-        return base_scarcity * dynamic_multiplier
+        return scaled_base * dynamic_multiplier
 
     def get_position_scarcity_report(
         self,
@@ -1219,7 +1220,7 @@ class RecommendationEngine:
 
             # Calculate a composite "recommendation score" (higher = better pick)
             # Factors: consensus rank (inverted), risk score (inverted), projection quality
-            rank_score = 100 - min(100, (player.consensus_rank or 200) / 2)
+            rank_score = max(0, 100 - (player.consensus_rank or 200) * 1.2)
             risk_score = 100 - assessment.score
 
             # Projection quality score
@@ -1297,27 +1298,39 @@ class RecommendationEngine:
         return recommendations
 
     def _calculate_projection_quality(self, player: Player) -> float:
-        """Score based on projection quality (more/better projections = higher)."""
+        """Score based on projection coverage and cross-source agreement.
+
+        Measures *confidence* in the projections, not raw production level.
+        Two signals:
+          1. Source count — more independent sources = more reliable.
+          2. Cross-source agreement on playing time (PA for batters, IP for
+             pitchers) — low variance means forecasters agree on role/health.
+        """
         if not player.projections:
-            return 30  # Low score for no projections
+            return 30
 
-        score = 50  # Base score
+        # Signal 1: source count (50 base, +5 per source up to +30 for 6+)
+        source_count = len(player.projections)
+        score = 50 + min(30, source_count * 5)
 
-        # More projection sources = more reliable
-        score += min(20, len(player.projections) * 5)
+        # Signal 2: cross-source agreement on playing time
+        if source_count >= 2:
+            pt_values = [p.pa for p in player.projections if p.pa]
+            if not pt_values:
+                pt_values = [p.ip for p in player.projections if p.ip]
 
-        # Higher projected counting stats = more valuable
-        if player.projections:
-            max_hr = max((p.hr or 0) for p in player.projections)
-            max_sb = max((p.sb or 0) for p in player.projections)
-            max_k = max((p.strikeouts or 0) for p in player.projections)
-
-            if max_hr >= 30:
-                score += 10
-            if max_sb >= 20:
-                score += 10
-            if max_k >= 200:
-                score += 10
+            if len(pt_values) >= 2:
+                mean_pt = statistics.mean(pt_values)
+                if mean_pt > 0:
+                    cv = statistics.stdev(pt_values) / mean_pt
+                    if cv < 0.05:
+                        score += 20
+                    elif cv < 0.10:
+                        score += 15
+                    elif cv < 0.15:
+                        score += 10
+                    elif cv < 0.25:
+                        score += 5
 
         return min(100, score)
 
@@ -1468,6 +1481,7 @@ class RecommendationEngine:
             risk_level=risk_level,
             category_impact=self._get_category_impact(player),
             sources=sources,
+            composite=scores.get('composite', 0.0),
         )
 
     def _build_recommendation_summary(

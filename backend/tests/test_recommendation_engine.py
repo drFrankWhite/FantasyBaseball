@@ -734,15 +734,17 @@ class TestPositionScarcity:
     """Tests for calculate_position_scarcity method."""
 
     def test_base_scarcity_applied(self, mock_player_factory):
-        """Base scarcity multipliers from config should be applied."""
+        """Base scarcity multipliers from config should be applied after fade-in."""
         engine = RecommendationEngine()
         # Create players for different positions
         catcher = mock_player_factory(name="C1", primary_position="C")
         first_base = mock_player_factory(name="1B1", primary_position="1B")
 
-        # Catcher has 1.35 base scarcity, 1B has 0.90
-        c_scarcity = engine.calculate_position_scarcity("C", [catcher], 0, 12)
-        fb_scarcity = engine.calculate_position_scarcity("1B", [first_base], 0, 12)
+        # Base scarcity fades in over 5 rounds; use 60 picks (5 full rounds × 12 teams)
+        # so round_factor == 1.0 and the full base multiplier is applied.
+        # C bonus=+6 → base 1.30; 1B bonus=-3 → base 0.85
+        c_scarcity = engine.calculate_position_scarcity("C", [catcher], 60, 12)
+        fb_scarcity = engine.calculate_position_scarcity("1B", [first_base], 60, 12)
 
         assert c_scarcity > fb_scarcity, "C should be more scarce than 1B"
 
@@ -809,12 +811,12 @@ class TestRecommendedPicksWithPositionAwareness:
             "Catcher should be recommended first due to position need"
 
     def test_scarcity_affects_recommendations(self, mock_player_factory):
-        """Scarce positions should be weighted higher early in draft."""
+        """Scarce positions should be weighted higher once scarcity fade-in completes."""
         from tests.conftest import MockPlayerRanking, MockPlayerProjection
 
         engine = RecommendationEngine()
 
-        # Create SS and 1B with same rank
+        # Create SS and 1B with same rank and similar projections
         shortstop = mock_player_factory(
             name="Elite SS",
             primary_position="SS",
@@ -830,16 +832,17 @@ class TestRecommendedPicksWithPositionAwareness:
             projections=[MockPlayerProjection(pa=600, hr=35)],
         )
 
-        # No roster yet - should favor scarce position
+        # Use 60 picks (5 full rounds × 12 teams) so scarcity fade-in is complete.
+        # SS bonus=+5 → base 1.25; 1B bonus=-3 → base 0.85; SS should rank higher.
         recommendations = engine.get_recommended_picks(
             players=[shortstop, first_base],
             my_team_players=[],
-            total_picks_made=0,
+            total_picks_made=60,
             num_teams=12,
             limit=2,
         )
 
-        # SS (1.20 scarcity) should rank higher than 1B (0.90 scarcity)
+        # SS (scarcity ~1.25) should rank higher than 1B (scarcity ~0.85)
         assert recommendations[0].player.name == "Elite SS", \
             "SS should rank higher due to position scarcity"
 

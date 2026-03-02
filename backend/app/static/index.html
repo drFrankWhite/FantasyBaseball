@@ -6,7 +6,7 @@
     <title>Fantasy Baseball Draft Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/static/css/style.css?v=32">
+    <link rel="stylesheet" href="/static/css/style.css?v=33">
 </head>
 <body class="bg-gray-900 text-gray-100 h-screen overflow-hidden flex flex-col">
     <!-- Draft Session Bar (shown when session is active) -->
@@ -309,9 +309,6 @@
                 <button onclick="showTab('recommendations')" class="tab-btn active px-4 py-3 text-sm font-medium" data-tab="recommendations" role="tab" aria-selected="true" aria-controls="tab-recommendations">
                     Picks
                 </button>
-                <button onclick="showTab('my-team')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="my-team" role="tab" aria-selected="false" aria-controls="tab-my-team">
-                    My Team
-                </button>
                 <button onclick="showTab('market')" class="tab-btn px-4 py-3 text-sm font-medium" data-tab="market" role="tab" aria-selected="false" aria-controls="tab-market">
                     Market
                 </button>
@@ -327,6 +324,16 @@
             <div class="flex-1 overflow-y-auto p-4">
                 <!-- Recommendations Tab — Decision Funnel Layout -->
                 <div id="tab-recommendations" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-recommendations">
+
+                    <!-- My Team (Pinned at top of Picks tab) -->
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-lg font-semibold">My Team</h3>
+                        </div>
+                        <div id="my-roster-inline" class="space-y-2">
+                            <!-- Roster loaded dynamically -->
+                        </div>
+                    </div>
 
                     <!-- Pick Status Banner -->
                     <div id="sidebar-pick-banner" class="pick-status-banner pick-waiting mb-3" aria-live="polite">
@@ -347,15 +354,6 @@
                     </div>
 
                 </div>
-
-                <!-- My Team Tab -->
-                <div id="tab-my-team" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-my-team">
-                    <h3 class="text-lg font-semibold mb-4">Your Roster</h3>
-                    <div id="my-roster" class="space-y-2">
-                        <!-- Roster loaded dynamically -->
-                    </div>
-                </div>
-
                 <!-- Market Tab -->
                 <div id="tab-market" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-market">
                     <h3 class="text-lg font-semibold mb-4">Market Context</h3>

@@ -282,23 +282,44 @@ async def get_my_team_roster(
 ):
     """Get all players drafted to user's team."""
     team_id = None
-    if league_id and user_key:
-        team_result = await db.execute(
-            select(Team).where(Team.league_id == league_id, Team.claimed_by_user == user_key)
-        )
-        claimed_team = team_result.scalar_one_or_none()
-        if claimed_team:
-            team_id = claimed_team.id
+    if league_id:
+        # Multi-user path: resolve by claimed team when user_key is provided.
+        if user_key:
+            try:
+                team_result = await db.execute(
+                    select(Team).where(Team.league_id == league_id, Team.claimed_by_user == user_key)
+                )
+                claimed_team = team_result.scalar_one_or_none()
+                if claimed_team:
+                    team_id = claimed_team.id
+            except Exception:
+                # Keep endpoint resilient when schema/version is temporarily out of sync.
+                logger.exception(
+                    "Failed claim lookup in get_my_team_roster (league_id=%s, user_key=%s)",
+                    league_id,
+                    user_key,
+                )
+
+        # Legacy fallback: single-user "is_user_team" flag.
+        if team_id is None:
+            legacy_result = await db.execute(
+                select(Team).where(Team.league_id == league_id, Team.is_user_team == True)
+            )
+            legacy_team = legacy_result.scalar_one_or_none()
+            if legacy_team:
+                team_id = legacy_team.id
 
     if team_id is not None:
         query = (
             select(Player)
+            .options(selectinload(Player.position_tiers))
             .where(Player.drafted_by_team_id == team_id)
             .order_by(Player.consensus_rank.asc().nullslast())
         )
     else:
         query = (
             select(Player)
+            .options(selectinload(Player.position_tiers))
             .where(Player.drafted_by_team_id == -1)  # Legacy quick-practice mode
             .order_by(Player.consensus_rank.asc().nullslast())
         )
